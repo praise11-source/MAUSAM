@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const BACKEND_URL = "http://localhost:5000"; // Replace with your backend URL
+const BACKEND_URL = "https://mausam-eta9.onrender.com/"; // Replace with your backend URL
 
 function App() {
   const [persona, setPersona] = useState("commuter");

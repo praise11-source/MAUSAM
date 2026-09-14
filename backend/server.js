@@ -1,94 +1,120 @@
 const express = require("express");
 const cors = require("cors");
 
-const getPersonalizedInsights = require("./personalization/personalization");
+const { getPersonalizedInsights } = require("./personalization");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// ------------------------------------
-// HOME
-// ------------------------------------
+const PORT = process.env.PORT || 5000;
 
-app.get("/", (req, res) => {
-  res.json({
-    message: "Atmos weather backend is running!",
-  });
-});
+async function getWeather(latitude, longitude) {
+  const url =
+    "https://api.open-meteo.com/v1/forecast" +
+    `?latitude=${latitude}` +
+    `&longitude=${longitude}` +
+    "&current=" +
+    [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "apparent_temperature",
+      "precipitation",
+      "wind_speed_10m",
+      "uv_index",
+      "weather_code",
+      "is_day",
+    ].join(",") +
+    "&hourly=" +
+    [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "precipitation_probability",
+      "precipitation",
+      "wind_speed_10m",
+      "weather_code",
+      "is_day",
+      "soil_moisture_0_to_7cm",
+      "soil_temperature_0cm",
+    ].join(",") +
+    "&daily=" +
+    [
+      "weather_code",
+      "temperature_2m_max",
+      "temperature_2m_min",
+      "precipitation_probability_max",
+      "sunrise",
+      "sunset",
+      "uv_index_max",
+    ].join(",") +
+    "&timezone=auto";
 
-// ------------------------------------
-// WEATHER API
-// ------------------------------------
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      `Open-Meteo returned ${response.status}`
+    );
+  }
+
+  return await response.json();
+}
+
+/* ---------------- WEATHER ---------------- */
 
 app.get("/api/weather", async (req, res) => {
   try {
-    const latitude = Number(req.query.lat ?? 28.6139);
-    const longitude = Number(req.query.lon ?? 77.209);
+    const latitude = Number(req.query.lat);
+    const longitude = Number(req.query.lon);
 
-    const url =
-      `https://api.open-meteo.com/v1/forecast?` +
-      `latitude=${latitude}` +
-      `&longitude=${longitude}` +
-      `&current=` +
-      `temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,uv_index,weather_code,apparent_temperature` +
-      `&hourly=` +
-      `temperature_2m,precipitation_probability,weather_code` +
-      `&daily=` +
-      `temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset` +
-      `&timezone=auto` +
-      `&forecast_days=7`;
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error("Weather API request failed");
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      return res.status(400).json({
+        error: "Valid latitude and longitude are required",
+      });
     }
 
-    const data = await response.json();
+    const weather = await getWeather(
+      latitude,
+      longitude
+    );
 
-    res.json(data);
+    res.json(weather);
   } catch (error) {
-    console.error("Weather API error:", error);
+    console.error("Weather error:", error);
 
     res.status(500).json({
-      error: "Unable to fetch weather data",
+      error: "Unable to fetch weather",
     });
   }
 });
 
-// ------------------------------------
-// PERSONALIZED WEATHER API
-// ------------------------------------
+/* ---------------- PERSONALIZED ---------------- */
 
 app.get("/api/personalized", async (req, res) => {
   try {
-    const persona = req.query.persona || "commuter";
+    const latitude = Number(req.query.lat);
+    const longitude = Number(req.query.lon);
 
-    const latitude = Number(req.query.lat ?? 28.6139);
-    const longitude = Number(req.query.lon ?? 77.209);
+    const persona =
+      req.query.persona || "commuter";
 
-    const url =
-      `https://api.open-meteo.com/v1/forecast?` +
-      `latitude=${latitude}` +
-      `&longitude=${longitude}` +
-      `&current=` +
-      `temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,uv_index,weather_code,apparent_temperature` +
-      `&hourly=` +
-      `temperature_2m,precipitation_probability,weather_code,soil_moisture_0_to_7cm,soil_temperature_0cm` +
-      `&daily=` +
-      `temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset` +
-      `&timezone=auto` +
-      `&forecast_days=7`;
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error("Weather API request failed");
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      return res.status(400).json({
+        error: "Valid latitude and longitude are required",
+      });
     }
 
-    const weather = await response.json();
+    const weather = await getWeather(
+      latitude,
+      longitude
+    );
 
     const insights = getPersonalizedInsights(
       persona,
@@ -97,26 +123,36 @@ app.get("/api/personalized", async (req, res) => {
 
     res.json({
       persona,
-      weather: weather.current,
+      current: weather.current,
       hourly: weather.hourly,
       daily: weather.daily,
+      timezone: weather.timezone,
+      timezone_abbreviation:
+        weather.timezone_abbreviation,
+      latitude: weather.latitude,
+      longitude: weather.longitude,
       insights,
     });
   } catch (error) {
-    console.error("Personalized weather error:", error);
+    console.error(
+      "Personalized weather error:",
+      error
+    );
 
     res.status(500).json({
-      error: "Unable to generate personalized weather information",
+      error: "Unable to generate personalized weather",
     });
   }
 });
 
-// ------------------------------------
-// START SERVER
-// ------------------------------------
+app.get("/", (req, res) => {
+  res.json({
+    status: "Atmos backend is running",
+  });
+});
 
-const PORT = 5000;
-
-app.listen(PORT, () => {
-  console.log(`Atmos backend running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(
+    `Atmos backend running on port ${PORT}`
+  );
 });

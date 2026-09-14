@@ -1,48 +1,210 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
-const BACKEND_URL = "https://mausam-eta9.onrender.com"; // Replace with your backend URL
+const BACKEND_URL = "https://mausam-eta9.onrender.com";
+
+const PERSONAS = [
+  {
+    id: "agriculture",
+    icon: "🌾",
+    title: "Agriculture",
+    description: "Crops, soil & irrigation",
+  },
+  {
+    id: "commuter",
+    icon: "🚗",
+    title: "Commuter",
+    description: "Travel & road conditions",
+  },
+  {
+    id: "traveller",
+    icon: "✈️",
+    title: "Traveller",
+    description: "Outdoor plans & comfort",
+  },
+];
+
+function getInsightIcon(type) {
+  const icons = {
+    rain: "🌧️",
+    irrigation: "💧",
+    heat: "🌡️",
+    wind: "💨",
+    uv: "☀️",
+    humidity: "💦",
+    good: "✨",
+  };
+
+  return icons[type] || "💡";
+}
+
+function getWeatherCondition(weather) {
+  const precipitation = Number(weather?.precipitation ?? 0);
+  const humidity = Number(weather?.relative_humidity_2m ?? 0);
+  const temperature = Number(weather?.temperature_2m ?? 0);
+
+  if (precipitation > 0) {
+    return {
+      label: "Rainy",
+      icon: "🌧️",
+    };
+  }
+
+  if (temperature >= 35) {
+    return {
+      label: "Hot",
+      icon: "☀️",
+    };
+  }
+
+  if (humidity >= 80) {
+    return {
+      label: "Humid",
+      icon: "🌤️",
+    };
+  }
+
+  if (temperature <= 15) {
+    return {
+      label: "Cool",
+      icon: "🌥️",
+    };
+  }
+
+  return {
+    label: "Clear",
+    icon: "☀️",
+  };
+}
+
+function getTimeLabel(time) {
+  if (!time) return "--";
+
+  const date = new Date(time);
+
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getDayLabel(time, index) {
+  if (!time) {
+    return index === 0 ? "Today" : `Day ${index + 1}`;
+  }
+
+  const date = new Date(`${time}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return index === 0 ? "Today" : `Day ${index + 1}`;
+  }
+
+  if (index === 0) {
+    return "Today";
+  }
+
+  return date.toLocaleDateString([], {
+    weekday: "short",
+  });
+}
+
+function getForecastIcon(precipitationProbability, temperature) {
+  const rain = Number(precipitationProbability ?? 0);
+  const temp = Number(temperature ?? 0);
+
+  if (rain >= 60) {
+    return "🌧️";
+  }
+
+  if (rain >= 30) {
+    return "🌦️";
+  }
+
+  if (temp >= 35) {
+    return "☀️";
+  }
+
+  if (temp <= 15) {
+    return "🌥️";
+  }
+
+  return "☀️";
+}
+
+function getInsightClass(priority) {
+  if (priority === "high") {
+    return "insight-high";
+  }
+
+  if (priority === "medium") {
+    return "insight-medium";
+  }
+
+  return "insight-low";
+}
 
 function App() {
-  const [persona, setPersona] = useState("commuter");
+  const [persona, setPersona] = useState("agriculture");
   const [location, setLocation] = useState(null);
-  const [locationName, setLocationName] = useState("");
-  const [data, setData] = useState(null);
+  const [locationName, setLocationName] = useState("Detecting location...");
+  const [weatherData, setWeatherData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [locationError, setLocationError] = useState("");
-
-  // -----------------------------------------
-  // GET USER LOCATION
-  // -----------------------------------------
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      setLocationError("Location services are not supported.");
-
       setLocation({
-        lat: 28.6139,
-        lon: 77.209,
+        latitude: 28.6139,
+        longitude: 77.209,
       });
 
+      setLocationName("New Delhi");
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-        });
-      },
-      () => {
-        setLocationError(
-          "Location permission denied. Using New Delhi."
-        );
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
 
         setLocation({
-          lat: 28.6139,
-          lon: 77.209,
+          latitude,
+          longitude,
         });
+
+        try {
+          const response = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+          );
+
+          if (!response.ok) {
+            throw new Error("Reverse geocoding failed");
+          }
+
+          const data = await response.json();
+
+          const city =
+            data.city ||
+            data.locality ||
+            data.principalSubdivision ||
+            "Your location";
+
+          setLocationName(city);
+        } catch {
+          setLocationName("Your location");
+        }
+      },
+      () => {
+        setLocation({
+          latitude: 28.6139,
+          longitude: 77.209,
+        });
+
+        setLocationName("New Delhi");
       },
       {
         enableHighAccuracy: true,
@@ -52,268 +214,192 @@ function App() {
     );
   }, []);
 
-  // -----------------------------------------
-  // GET LOCATION NAME
-  // -----------------------------------------
-
   useEffect(() => {
-    if (!location) return;
+    if (!location) {
+      return;
+    }
 
-    const getLocationName = async () => {
-      try {
-        const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${location.lat}&longitude=${location.lon}&localityLanguage=en`
-        );
+    let cancelled = false;
 
-        if (!response.ok) {
-          throw new Error("Location lookup failed");
-        }
-
-        const result = await response.json();
-
-        const city =
-          result.city ||
-          result.locality ||
-          result.principalSubdivision ||
-          "Your location";
-
-        const state = result.principalSubdivision || "";
-
-        setLocationName(
-          state && city !== state
-            ? `${city}, ${state}`
-            : city
-        );
-      } catch (error) {
-        console.error(error);
-        setLocationName("Your location");
-      }
-    };
-
-    getLocationName();
-  }, [location]);
-
-  // -----------------------------------------
-  // FETCH WEATHER
-  // -----------------------------------------
-
-  useEffect(() => {
-    if (!location) return;
-
-    const fetchWeather = async () => {
+    async function fetchWeather() {
       setLoading(true);
+      setError("");
 
       try {
-        const response = await fetch(
-          `${BACKEND_URL}/api/personalized?persona=${persona}&lat=${location.lat}&lon=${location.lon}`
-        );
+        const url =
+          `${BACKEND_URL}/api/personalized` +
+          `?persona=${encodeURIComponent(persona)}` +
+          `&lat=${location.latitude}` +
+          `&lon=${location.longitude}`;
+
+        const response = await fetch(url);
 
         if (!response.ok) {
-          throw new Error("Weather request failed");
+          throw new Error(
+            `Weather server returned ${response.status}`
+          );
         }
 
-        const result = await response.json();
+        const data = await response.json();
 
-        setData(result);
-      } catch (error) {
-        console.error("Weather error:", error);
-        setData(null);
+        if (cancelled) {
+          return;
+        }
+
+        setWeatherData(data);
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error("Weather fetch error:", err);
+
+        setError(
+          "Unable to load weather right now. Please check that the backend is running."
+        );
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    };
+    }
 
     fetchWeather();
-  }, [persona, location]);
 
-  // -----------------------------------------
-  // PERSONA TITLE
-  // -----------------------------------------
-
-  const getPersonaTitle = () => {
-    if (persona === "commuter") return "Your commute";
-    if (persona === "agriculture") return "Your garden & crops";
-    if (persona === "traveller") return "Your travel";
-
-    return "Your weather";
-  };
-
-  // -----------------------------------------
-  // WEATHER CONDITION
-  // -----------------------------------------
-
-  const getWeatherCondition = () => {
-    if (!data?.weather) {
-      return {
-        icon: "🌤️",
-        label: "Weather",
-      };
-    }
-
-    const rain =
-      Number(data.weather.precipitation || 0);
-
-    const rainProbability =
-      Number(
-        data.hourly?.precipitation_probability?.[0] || 0
-      );
-
-    const temperature =
-      Number(data.weather.temperature_2m || 0);
-
-    if (rain > 0.2) {
-      return {
-        icon: "🌧️",
-        label: "Rainy",
-      };
-    }
-
-    if (rainProbability >= 60) {
-      return {
-        icon: "🌦️",
-        label: "Rain likely",
-      };
-    }
-
-    if (temperature >= 35) {
-      return {
-        icon: "☀️",
-        label: "Hot",
-      };
-    }
-
-    return {
-      icon: "☀️",
-      label: "Clear",
+    return () => {
+      cancelled = true;
     };
-  };
+  }, [location, persona]);
 
-  // -----------------------------------------
-  // DAY / NIGHT
-  // -----------------------------------------
+  const weather = weatherData?.weather || {};
+  const hourly = weatherData?.hourly || {};
+  const daily = weatherData?.daily || {};
 
-  const isDaytime = () => {
-    if (!data?.daily?.sunrise || !data?.daily?.sunset) {
-      const hour = new Date().getHours();
-      return hour >= 6 && hour < 18;
-    }
+  const insights = Array.isArray(weatherData?.insights)
+    ? weatherData.insights
+    : [];
 
-    const now = new Date();
+  const currentTemperature = Number(
+    weather?.temperature_2m ?? 0
+  );
 
-    const sunrise = new Date(
-      data.daily.sunrise[0]
-    );
+  const humidity = Number(
+    weather?.relative_humidity_2m ?? 0
+  );
 
-    const sunset = new Date(
-      data.daily.sunset[0]
-    );
+  const precipitation = Number(
+    weather?.precipitation ?? 0
+  );
 
-    return now >= sunrise && now <= sunset;
-  };
+  const wind = Number(
+    weather?.wind_speed_10m ?? 0
+  );
 
-  // -----------------------------------------
-  // MAIN WEATHER ICON
-  // -----------------------------------------
+  const uv = Number(
+    weather?.uv_index ?? 0
+  );
 
-  const getMainWeatherIcon = () => {
-    const condition = getWeatherCondition();
+  const soilMoisture =
+    hourly?.soil_moisture_0_to_7cm?.[0] ?? null;
 
-    if (condition.label === "Rainy") {
-      return "🌧️";
-    }
+  const soilTemperature =
+    hourly?.soil_temperature_0cm?.[0] ?? null;
 
-    if (condition.label === "Rain likely") {
-      return isDaytime() ? "🌦️" : "🌧️";
-    }
+  const condition = useMemo(
+    () => getWeatherCondition(weather),
+    [weather]
+  );
 
-    if (!isDaytime()) {
-      return "🌙";
-    }
+  const selectedPersona = PERSONAS.find(
+    (item) => item.id === persona
+  );
 
-    return "☀️";
-  };
+  const hourlyForecast = useMemo(() => {
+    const times = Array.isArray(hourly?.time)
+      ? hourly.time
+      : [];
 
-  // -----------------------------------------
-  // FIND CURRENT HOURLY INDEX
-  // -----------------------------------------
+    const temperatures = Array.isArray(
+      hourly?.temperature_2m
+    )
+      ? hourly.temperature_2m
+      : [];
 
-  const getCurrentHourIndex = () => {
-    if (!data?.hourly?.time) return 0;
+    const rainProbabilities = Array.isArray(
+      hourly?.precipitation_probability
+    )
+      ? hourly.precipitation_probability
+      : [];
 
-    const currentTime =
-      data.weather?.time;
+    return times.slice(0, 12).map((time, index) => ({
+      time,
+      temperature: temperatures[index],
+      rainProbability: rainProbabilities[index],
+    }));
+  }, [hourly]);
 
-    if (currentTime) {
-      const exactIndex =
-        data.hourly.time.indexOf(currentTime);
+  const dailyForecast = useMemo(() => {
+    const times = Array.isArray(daily?.time)
+      ? daily.time
+      : [];
 
-      if (exactIndex >= 0) {
-        return exactIndex;
-      }
-    }
+    const temperatures = Array.isArray(
+      daily?.temperature_2m_max
+    )
+      ? daily.temperature_2m_max
+      : [];
 
-    const now = new Date();
+    const rainProbabilities = Array.isArray(
+      daily?.precipitation_probability_max
+    )
+      ? daily.precipitation_probability_max
+      : [];
 
-    let closestIndex = 0;
-    let smallestDifference = Infinity;
+    return times.slice(0, 5).map((time, index) => ({
+      time,
+      temperature: temperatures[index],
+      rainProbability: rainProbabilities[index],
+    }));
+  }, [daily]);
 
-    data.hourly.time.forEach((time, index) => {
-      const difference = Math.abs(
-        new Date(time).getTime() - now.getTime()
-      );
+  const sunrise = daily?.sunrise?.[0];
+  const sunset = daily?.sunset?.[0];
 
-      if (difference < smallestDifference) {
-        smallestDifference = difference;
-        closestIndex = index;
-      }
-    });
-
-    return closestIndex;
-  };
-
-  // -----------------------------------------
-  // HOURLY ICON
-  // -----------------------------------------
-
-  const getHourlyIcon = (rainProbability, time) => {
-    const hour = new Date(time).getHours();
-
-    const isDay =
-      hour >= 6 && hour < 18;
-
-    if (rainProbability >= 60) {
-      return isDay ? "🌦️" : "🌧️";
-    }
-
-    if (rainProbability >= 30) {
-      return isDay ? "🌤️" : "☁️";
-    }
-
-    return isDay ? "☀️" : "🌙";
-  };
-
-  // -----------------------------------------
-  // FORMAT HOUR
-  // -----------------------------------------
-
-  const formatHour = (time) => {
-    return new Date(time).toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
-
-  // -----------------------------------------
-  // LOADING
-  // -----------------------------------------
-
-  if (loading) {
+  if (loading && !weatherData) {
     return (
-      <div className="app">
-        <div className="loading-screen">
-          <div className="loading-icon">🌦️</div>
-          <h2>Loading your weather...</h2>
-          <p>Personalizing your forecast</p>
+      <div className="app loading-screen">
+        <div className="loading-card">
+          <div className="loading-logo">A</div>
+
+          <div className="loading-spinner"></div>
+
+          <h2>Preparing your weather</h2>
+
+          <p>
+            Atmos is checking live conditions for your
+            location.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !weatherData) {
+    return (
+      <div className="app error-screen">
+        <div className="error-card">
+          <div className="error-icon">⚠️</div>
+
+          <h2>Weather unavailable</h2>
+
+          <p>{error}</p>
+
+          <button
+            className="retry-button"
+            onClick={() => window.location.reload()}
+          >
+            Try again
+          </button>
         </div>
       </div>
     );
@@ -321,504 +407,384 @@ function App() {
 
   return (
     <div className="app">
-
-      {/* -------------------------------- */}
-      {/* HEADER */}
-      {/* -------------------------------- */}
-
       <header className="header">
-
         <div className="brand">
-
-          <div className="brand-icon">
-            🌦️
-          </div>
+          <div className="brand-icon">A</div>
 
           <div>
-            <h1>MAUSAM</h1>
-            <p>Adaptive Weather Intelligence</p>
+            <h1>Atmos</h1>
+            <span>Adaptive weather intelligence</span>
           </div>
-
         </div>
 
         <div className="location">
-          📍 {locationName || "Detecting location..."}
-        </div>
+          <span className="location-icon">📍</span>
 
+          <div>
+            <small>YOUR LOCATION</small>
+            <strong>{locationName}</strong>
+          </div>
+        </div>
       </header>
 
-      {/* -------------------------------- */}
-      {/* LOCATION NOTICE */}
-      {/* -------------------------------- */}
-
-      {locationError && (
-        <div className="notice">
+      {error && (
+        <div className="notice error-notice">
           <span>⚠️</span>
-          <span>{locationError}</span>
+          <span>{error}</span>
         </div>
       )}
 
-      {/* -------------------------------- */}
-      {/* PERSONA */}
-      {/* -------------------------------- */}
-
-      <section className="persona-section">
-
-        <div className="section-label">
-          PERSONALIZE
-        </div>
-
-        <h2>What matters to you?</h2>
-
-        <div className="persona-buttons">
-
-          <button
-            className={
-              persona === "commuter"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              setPersona("commuter")
-            }
-          >
-            <span className="persona-icon">
-              🚗
-            </span>
-
-            <span>
-              <strong>Commuter</strong>
-              <small>Travel conditions</small>
-            </span>
-          </button>
-
-          <button
-            className={
-              persona === "agriculture"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              setPersona("agriculture")
-            }
-          >
-            <span className="persona-icon">
-              🌱
-            </span>
-
-            <span>
-              <strong>Agriculture</strong>
-              <small>Garden & crops</small>
-            </span>
-          </button>
-
-          <button
-            className={
-              persona === "traveller"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              setPersona("traveller")
-            }
-          >
-            <span className="persona-icon">
-              ✈️
-            </span>
-
-            <span>
-              <strong>Traveller</strong>
-              <small>Trip conditions</small>
-            </span>
-          </button>
-
-        </div>
-
-      </section>
-
-      {/* -------------------------------- */}
-      {/* WEATHER */}
-      {/* -------------------------------- */}
-
-      {data ? (
-        <>
-
-          <section className="weather-card">
-
-            <div className="weather-main">
-
-              <div className="weather-information">
-
-                <div className="small-text">
-                  CURRENT WEATHER
-                </div>
-
-                <div className="temperature">
-                  {data.weather?.temperature_2m ?? "—"}
-                  <span>°C</span>
-                </div>
-
-                <div className="weather-location">
-                  📍 {locationName || "Your location"}
-                </div>
-
-                <div className="condition-text">
-                  {getWeatherCondition().label}
-                  {" • "}
-                  {isDaytime()
-                    ? "Daytime"
-                    : "Nighttime"}
-                </div>
-
-              </div>
-
-              <div className="main-weather-icon">
-                {getMainWeatherIcon()}
-              </div>
-
-            </div>
-
-            {/* WEATHER STATS */}
-
-            <div className="weather-stats">
-
-              <div className="stat-card">
-                <span className="stat-icon">
-                  💧
-                </span>
-
-                <div>
-                  <p>Humidity</p>
-
-                  <strong>
-                    {data.weather?.relative_humidity_2m ?? "—"}%
-                  </strong>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <span className="stat-icon">
-                  🌧️
-                </span>
-
-                <div>
-                  <p>Rainfall</p>
-
-                  <strong>
-                    {data.weather?.precipitation ?? "—"} mm
-                  </strong>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <span className="stat-icon">
-                  💨
-                </span>
-
-                <div>
-                  <p>Wind</p>
-
-                  <strong>
-                    {data.weather?.wind_speed_10m ?? "—"} km/h
-                  </strong>
-                </div>
-              </div>
-
-              {/* AGRICULTURE */}
-
-              {persona === "agriculture" && (
-                <>
-
-                  <div className="stat-card">
-                    <span className="stat-icon">
-                      ☀️
-                    </span>
-
-                    <div>
-                      <p>UV Index</p>
-
-                      <strong>
-                        {data.weather?.uv_index ?? "—"}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="stat-card">
-                    <span className="stat-icon">
-                      🌱
-                    </span>
-
-                    <div>
-                      <p>Soil Moisture</p>
-
-                      <strong>
-                        {data.currentSoilMoisture != null
-                          ? `${Number(
-                              data.currentSoilMoisture
-                            ).toFixed(3)}`
-                          : data.hourly?.soil_moisture_0_to_7cm?.[0] != null
-                          ? `${Number(
-                              data.hourly.soil_moisture_0_to_7cm[0]
-                            ).toFixed(3)}`
-                          : "—"}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="stat-card">
-                    <span className="stat-icon">
-                      🌡️
-                    </span>
-
-                    <div>
-                      <p>Soil Temperature</p>
-
-                      <strong>
-                        {data.currentSoilTemperature != null
-                          ? `${Number(
-                              data.currentSoilTemperature
-                            ).toFixed(1)}°C`
-                          : data.hourly?.soil_temperature_0cm?.[0] != null
-                          ? `${Number(
-                              data.hourly.soil_temperature_0cm[0]
-                            ).toFixed(1)}°C`
-                          : "—"}
-                      </strong>
-                    </div>
-                  </div>
-
-                </>
-              )}
-
-            </div>
-
-          </section>
-
-          {/* -------------------------------- */}
-          {/* PERSONALIZED INSIGHTS */}
-          {/* -------------------------------- */}
-
-          <section className="insights">
-
-            <div className="section-heading">
-
+      <main>
+        <section className="hero-section">
+          <div className="hero-card">
+            <div className="hero-top">
               <div>
-                <div className="section-label">
-                  PERSONALIZED FOR YOU
-                </div>
+                <p className="eyebrow">CURRENT CONDITIONS</p>
 
                 <h2>
-                  {getPersonaTitle()}
+                  {currentTemperature.toFixed(1)}°
                 </h2>
 
-                <p className="section-description">
-                  Weather information selected specifically
-                  for your needs.
-                </p>
+                <div className="condition">
+                  <span className="condition-icon">
+                    {condition.icon}
+                  </span>
+
+                  <span>{condition.label}</span>
+                </div>
               </div>
 
+              <div className="hero-weather-icon">
+                {condition.icon}
+              </div>
+            </div>
+
+            <div className="hero-bottom">
+              <div>
+                <span>Humidity</span>
+                <strong>{humidity}%</strong>
+              </div>
+
+              <div>
+                <span>Rainfall</span>
+                <strong>{precipitation} mm</strong>
+              </div>
+
+              <div>
+                <span>Wind</span>
+                <strong>{wind} km/h</strong>
+              </div>
+
+              <div>
+                <span>UV Index</span>
+                <strong>{uv.toFixed(1)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="personalization-card">
+            <div className="card-heading">
+              <div>
+                <p className="eyebrow">PERSONALIZATION ENGINE</p>
+                <h2>What matters to you?</h2>
+              </div>
+
+              <span className="live-dot">LIVE</span>
+            </div>
+
+            <div className="persona-list">
+              {PERSONAS.map((item) => (
+                <button
+                  key={item.id}
+                  className={`persona-button ${
+                    persona === item.id
+                      ? "active"
+                      : ""
+                  }`}
+                  onClick={() => setPersona(item.id)}
+                >
+                  <span className="persona-icon">
+                    {item.icon}
+                  </span>
+
+                  <span className="persona-copy">
+                    <strong>{item.title}</strong>
+                    <small>{item.description}</small>
+                  </span>
+
+                  <span className="persona-arrow">
+                    →
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="selected-persona">
+              <span>{selectedPersona?.icon}</span>
+
+              <div>
+                <small>ACTIVE PROFILE</small>
+                <strong>
+                  {selectedPersona?.title}
+                </strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="forecast-section">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">FORECAST</p>
+              <h2>Next 5 days</h2>
+            </div>
+
+            <span className="forecast-location">
+              {locationName}
+            </span>
+          </div>
+
+          <div className="daily-grid">
+            {dailyForecast.map((day, index) => (
+              <div className="day-card" key={day.time}>
+                <span className="day-name">
+                  {getDayLabel(day.time, index)}
+                </span>
+
+                <span className="day-icon">
+                  {getForecastIcon(
+                    day.rainProbability,
+                    day.temperature
+                  )}
+                </span>
+
+                <strong className="day-temperature">
+                  {day.temperature !== undefined
+                    ? `${Math.round(day.temperature)}°`
+                    : "--"}
+                </strong>
+
+                <span className="day-rain">
+                  {day.rainProbability !== undefined
+                    ? `${day.rainProbability}% rain`
+                    : "--"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="content-grid">
+          <div className="main-column">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">ADVISORY</p>
+                <h2>
+                  {selectedPersona?.title} insights
+                </h2>
+              </div>
+
+              <span className="insight-count">
+                {insights.length} alerts
+              </span>
             </div>
 
             <div className="insight-grid">
-
-              {data.insights &&
-              data.insights.length > 0 ? (
-
-                data.insights.map(
-                  (insight, index) => (
-
-                    <div
-                      className={`insight-card ${
-                        insight.priority || ""
-                      }`}
-                      key={index}
-                    >
-
-                      <div className="insight-icon">
-
-                        {insight.type === "rain" &&
-                          "🌧️"}
-
-                        {insight.type === "wind" &&
-                          "💨"}
-
-                        {insight.type === "heat" &&
-                          "🌡️"}
-
-                        {insight.type === "humidity" &&
-                          "💧"}
-
-                        {insight.type === "irrigation" &&
-                          "💦"}
-
-                        {insight.type === "uv" &&
-                          "☀️"}
-
-                        {insight.type === "travel" &&
-                          "✈️"}
-
-                        {insight.type === "traffic" &&
-                          "🚗"}
-
-                        {insight.type === "good" &&
-                          "✅"}
-
-                        {insight.type === "normal" &&
-                          "✅"}
-
-                      </div>
-
-                      <div className="insight-content">
-
-                        <div className="insight-priority">
-                          {insight.priority === "high"
-                            ? "IMPORTANT"
-                            : insight.priority === "medium"
-                            ? "ADVISORY"
-                            : "TIP"}
-                        </div>
-
-                        <h3>
-                          {insight.title}
-                        </h3>
-
-                        <p>
-                          {insight.message}
-                        </p>
-
-                      </div>
-
+              {insights.length > 0 ? (
+                insights.map((insight, index) => (
+                  <article
+                    className={`insight-card ${getInsightClass(
+                      insight.priority
+                    )}`}
+                    key={`${insight.type}-${index}`}
+                  >
+                    <div className="insight-icon">
+                      {getInsightIcon(insight.type)}
                     </div>
 
-                  )
-                )
+                    <div className="insight-content">
+                      <div className="insight-header">
+                        <h3>{insight.title}</h3>
 
+                        <span
+                          className={`priority-badge ${insight.priority}`}
+                        >
+                          {insight.priority}
+                        </span>
+                      </div>
+
+                      <p>
+                        {insight.message ||
+                          insight.description ||
+                          "Atmos has detected a relevant weather condition."}
+                      </p>
+                    </div>
+                  </article>
+                ))
               ) : (
-
-                <div className="insight-card normal">
-
-                  <div className="insight-icon">
-                    ✅
-                  </div>
-
-                  <div>
-                    <h3>
-                      Weather looks good
-                    </h3>
-
-                    <p>
-                      No major weather concerns
-                      for your selected profile.
-                    </p>
-                  </div>
-
+                <div className="empty-insights">
+                  <span>✨</span>
+                  <h3>Everything looks good</h3>
+                  <p>
+                    Atmos does not currently have any
+                    important alerts for this profile.
+                  </p>
                 </div>
-
               )}
-
             </div>
 
-          </section>
-
-          {/* -------------------------------- */}
-          {/* HOURLY FORECAST */}
-          {/* -------------------------------- */}
-
-          <section className="hourly-section">
-
-            <div className="section-heading">
-
+            <div className="section-heading hourly-heading">
               <div>
-                <div className="section-label">
-                  HOURLY FORECAST
-                </div>
-
-                <h2>
-                  Next few hours
-                </h2>
+                <p className="eyebrow">HOURLY</p>
+                <h2>Coming up</h2>
               </div>
-
             </div>
 
             <div className="hourly-container">
+              {hourlyForecast.map((hour) => (
+                <div
+                  className="hour-card"
+                  key={hour.time}
+                >
+                  <span className="hour-time">
+                    {getTimeLabel(hour.time)}
+                  </span>
 
-              {data.hourly?.time
-                ?.slice(
-                  getCurrentHourIndex(),
-                  getCurrentHourIndex() + 12
-                )
-                .map((time, relativeIndex) => {
+                  <span className="hour-icon">
+                    {getForecastIcon(
+                      hour.rainProbability,
+                      hour.temperature
+                    )}
+                  </span>
 
-                  const actualIndex =
-                    getCurrentHourIndex() +
-                    relativeIndex;
+                  <strong>
+                    {hour.temperature !== undefined
+                      ? `${Math.round(
+                          hour.temperature
+                        )}°`
+                      : "--"}
+                  </strong>
 
-                  const rainProbability =
-                    data.hourly
-                      ?.precipitation_probability
-                      ?.[actualIndex] ?? 0;
-
-                  return (
-                    <div
-                      className="hour-card"
-                      key={time}
-                    >
-
-                      <strong>
-                        {relativeIndex === 0
-                          ? "Now"
-                          : formatHour(time)}
-                      </strong>
-
-                      <div className="hour-icon">
-                        {getHourlyIcon(
-                          rainProbability,
-                          time
-                        )}
-                      </div>
-
-                      <span>
-                        🌧️ {rainProbability}%
-                      </span>
-
-                    </div>
-                  );
-                })}
-
+                  <small>
+                    {hour.rainProbability !==
+                    undefined
+                      ? `${hour.rainProbability}%`
+                      : "--"}
+                  </small>
+                </div>
+              ))}
             </div>
-
-          </section>
-
-        </>
-      ) : (
-
-        <div className="error">
-
-          <div className="error-icon">
-            ⚠️
           </div>
 
-          <h2>
-            Unable to load weather data
-          </h2>
+          <aside className="side-column">
+            <div className="metric-card">
+              <div className="metric-card-heading">
+                <span>☀️</span>
+                <div>
+                  <p className="eyebrow">SOLAR</p>
+                  <h3>Sun today</h3>
+                </div>
+              </div>
 
-          <p>
-            Please try refreshing the page.
-          </p>
+              <div className="sun-times">
+                <div>
+                  <small>Sunrise</small>
+                  <strong>
+                    {getTimeLabel(sunrise)}
+                  </strong>
+                </div>
 
-        </div>
+                <div>
+                  <small>Sunset</small>
+                  <strong>
+                    {getTimeLabel(sunset)}
+                  </strong>
+                </div>
+              </div>
+            </div>
 
-      )}
+            {persona === "agriculture" && (
+              <div className="metric-card">
+                <div className="metric-card-heading">
+                  <span>🌱</span>
 
-      {/* -------------------------------- */}
-      {/* FOOTER */}
-      {/* -------------------------------- */}
+                  <div>
+                    <p className="eyebrow">SOIL</p>
+                    <h3>Growing conditions</h3>
+                  </div>
+                </div>
 
-      <footer>
-        <span>🌦️ MAUSAM</span>
-        <span>Adaptive Weather Intelligence</span>
+                <div className="soil-metrics">
+                  <div>
+                    <small>Moisture</small>
+
+                    <strong>
+                      {soilMoisture !== null
+                        ? `${(
+                            Number(soilMoisture) *
+                            100
+                          ).toFixed(0)}%`
+                        : "--"}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <small>Temperature</small>
+
+                    <strong>
+                      {soilTemperature !== null
+                        ? `${Number(
+                            soilTemperature
+                          ).toFixed(1)}°`
+                        : "--"}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="metric-card atmosphere-card">
+              <div className="metric-card-heading">
+                <span>🌤️</span>
+
+                <div>
+                  <p className="eyebrow">ATMOSPHERE</p>
+                  <h3>Current snapshot</h3>
+                </div>
+              </div>
+
+              <div className="snapshot-list">
+                <div>
+                  <span>Temperature</span>
+                  <strong>
+                    {currentTemperature.toFixed(1)}°
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Humidity</span>
+                  <strong>{humidity}%</strong>
+                </div>
+
+                <div>
+                  <span>Wind speed</span>
+                  <strong>{wind} km/h</strong>
+                </div>
+
+                <div>
+                  <span>UV index</span>
+                  <strong>{uv.toFixed(1)}</strong>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <span>Atmos</span>
+        <span>Personalized weather intelligence</span>
       </footer>
-
     </div>
   );
 }

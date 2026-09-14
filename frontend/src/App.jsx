@@ -1,122 +1,109 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 const BACKEND_URL = "https://mausam-eta9.onrender.com";
 
 const DEFAULT_LOCATION = {
-  name: "New Delhi",
-  admin1: "Delhi",
-  country: "India",
   latitude: 28.6139,
   longitude: 77.209,
 };
 
-const PERSONAS = {
-  commuter: {
+const PERSONAS = [
+  {
+    id: "commuter",
+    icon: "🚗",
     title: "Commuter",
-    icon: "→",
-    description: "Get practical advice for getting around safely and comfortably.",
+    description: "Travel & road conditions",
   },
-  traveller: {
+  {
+    id: "traveller",
+    icon: "✈️",
     title: "Traveller",
-    icon: "✈",
-    description: "Plan your day around weather, comfort and changing conditions.",
+    description: "Outdoor plans & comfort",
   },
-  agriculture: {
+  {
+    id: "agriculture",
+    icon: "🌾",
     title: "Agriculture",
-    icon: "⌁",
-    description: "Useful weather information for crops, irrigation and field work.",
+    description: "Crops, soil & irrigation",
   },
-};
+];
 
-function weatherDescription(code) {
-  const map = {
-    0: "Clear sky",
-    1: "Mainly clear",
-    2: "Partly cloudy",
-    3: "Overcast",
-    45: "Foggy",
-    48: "Foggy",
-    51: "Light drizzle",
-    53: "Drizzle",
-    55: "Heavy drizzle",
-    56: "Freezing drizzle",
-    57: "Heavy freezing drizzle",
-    61: "Light rain",
-    63: "Rain",
-    65: "Heavy rain",
-    66: "Freezing rain",
-    67: "Heavy freezing rain",
-    71: "Light snow",
-    73: "Snow",
-    75: "Heavy snow",
-    77: "Snow grains",
-    80: "Light showers",
-    81: "Showers",
-    82: "Heavy showers",
-    85: "Snow showers",
-    86: "Heavy snow showers",
-    95: "Thunderstorm",
-    96: "Thunderstorm with hail",
-    99: "Heavy thunderstorm with hail",
-  };
+function getWeatherIcon(weatherCode, isDay = 1) {
+  const code = Number(weatherCode ?? 0);
+  const day = Number(isDay) === 1;
 
-  return map[Number(code)] || "Unknown conditions";
-}
+  if (code === 0) return day ? "☀️" : "🌙";
 
-function weatherIcon(code, isDay = true) {
-  const c = Number(code);
+  if (code === 1) return day ? "🌤️" : "🌙";
+  if (code === 2) return "⛅";
+  if (code === 3) return "☁️";
 
-  if (!isDay) {
-    if ([95, 96, 99].includes(c)) return "⛈";
-    if ([61, 63, 65, 80, 81, 82].includes(c)) return "☾";
-    if ([45, 48].includes(c)) return "☾";
-    if ([71, 73, 75, 77, 85, 86].includes(c)) return "☾";
-    if ([1, 2, 3].includes(c)) return "☾";
-    return "☾";
+  if ([45, 48].includes(code)) return "🌫️";
+
+  if ([51, 53, 55, 56, 57].includes(code)) {
+    return "🌦️";
   }
 
-  if (c === 0) return "☀";
-  if ([1, 2].includes(c)) return "◐";
-  if (c === 3) return "☁";
-  if ([45, 48].includes(c)) return "≋";
-  if ([51, 53, 55, 56, 57].includes(c)) return "♨";
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(c)) return "☂";
-  if ([71, 73, 75, 77, 85, 86].includes(c)) return "❄";
-  if ([95, 96, 99].includes(c)) return "⛈";
+  if ([61, 63, 65, 66, 67].includes(code)) {
+    return "🌧️";
+  }
 
-  return "☀";
+  if ([71, 73, 75, 77].includes(code)) {
+    return "🌨️";
+  }
+
+  if ([80, 81, 82].includes(code)) {
+    return "🌧️";
+  }
+
+  if ([85, 86].includes(code)) {
+    return "🌨️";
+  }
+
+  if ([95, 96, 99].includes(code)) {
+    return "⛈️";
+  }
+
+  return day ? "☀️" : "🌙";
 }
 
-function getCurrentHourlyIndex(weather) {
-  const times = weather?.hourly?.time || [];
-  const currentTime = weather?.current?.time;
+function getWeatherDescription(code, isDay = 1) {
+  const value = Number(code ?? 0);
+  const day = Number(isDay) === 1;
 
-  if (!times.length || !currentTime) return 0;
+  if (value === 0) return day ? "Clear sky" : "Clear night";
+  if ([1].includes(value)) return day ? "Mainly clear" : "Mostly clear";
+  if ([2].includes(value)) return "Partly cloudy";
+  if ([3].includes(value)) return "Overcast";
 
-  const current = new Date(currentTime).getTime();
+  if ([45, 48].includes(value)) return "Foggy";
 
-  let closestIndex = 0;
-  let smallestDifference = Infinity;
+  if ([51, 53, 55].includes(value)) return "Drizzle";
+  if ([56, 57].includes(value)) return "Freezing drizzle";
 
-  times.forEach((time, index) => {
-    const difference = Math.abs(
-      new Date(time).getTime() - current
-    );
+  if ([61, 63, 65].includes(value)) return "Rain";
+  if ([66, 67].includes(value)) return "Freezing rain";
 
-    if (difference < smallestDifference) {
-      smallestDifference = difference;
-      closestIndex = index;
-    }
-  });
+  if ([71, 73, 75, 77].includes(value)) return "Snow";
 
-  return closestIndex;
+  if ([80, 81, 82].includes(value)) return "Rain showers";
+  if ([85, 86].includes(value)) return "Snow showers";
+
+  if ([95].includes(value)) return "Thunderstorm";
+  if ([96, 99].includes(value)) return "Thunderstorm with hail";
+
+  return day ? "Clear" : "Clear night";
 }
 
-function formatHour(time) {
+function getTimeLabel(time) {
   if (!time) return "--";
 
   const date = new Date(time);
+
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
 
   return date.toLocaleTimeString([], {
     hour: "numeric",
@@ -124,975 +111,1383 @@ function formatHour(time) {
   });
 }
 
-function formatDay(time, index) {
-  if (!time) return "--";
+function getDayLabel(time, index) {
+  if (!time) {
+    return index === 0 ? "Today" : `Day ${index + 1}`;
+  }
 
-  if (index === 0) return "Today";
-  if (index === 1) return "Tomorrow";
+  if (index === 0) {
+    return "Today";
+  }
 
-  return new Date(time).toLocaleDateString([], {
+  const date = new Date(`${time}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return `Day ${index + 1}`;
+  }
+
+  return date.toLocaleDateString([], {
     weekday: "short",
   });
 }
 
-function getLocationLabel(location) {
-  if (!location) return "Unknown location";
+function getInsightIcon(type) {
+  const icons = {
+    rain: "🌧️",
+    irrigation: "💧",
+    heat: "🌡️",
+    wind: "💨",
+    uv: "☀️",
+    humidity: "💦",
+    soil: "🌱",
+    good: "✨",
+  };
 
-  const parts = [
-    location.name,
-    location.admin1,
-  ].filter(Boolean);
+  return icons[type] || "💡";
+}
 
-  return parts.join(", ");
+function getInsightClass(priority) {
+  if (priority === "high") return "insight-high";
+  if (priority === "medium") return "insight-medium";
+  return "insight-low";
+}
+
+function getForecastIcon(rainProbability, temperature, weatherCode, isDay) {
+  if (weatherCode !== undefined && weatherCode !== null) {
+    return getWeatherIcon(weatherCode, isDay);
+  }
+
+  const rain = Number(rainProbability ?? 0);
+  const temp = Number(temperature ?? 0);
+
+  if (rain >= 60) return "🌧️";
+  if (rain >= 30) return "🌦️";
+  if (temp >= 35) return "☀️";
+  if (temp <= 15) return "🌥️";
+
+  return "☀️";
+}
+
+function buildLocalInsights(persona, weather) {
+  const current = weather?.current || {};
+  const hourly = weather?.hourly || {};
+  const insights = [];
+
+  const temperature = Number(current.temperature_2m ?? 0);
+  const humidity = Number(current.relative_humidity_2m ?? 0);
+  const precipitation = Number(current.precipitation ?? 0);
+  const wind = Number(current.wind_speed_10m ?? 0);
+  const uv = Number(current.uv_index ?? 0);
+
+  const rainProbability = Number(
+    hourly?.precipitation_probability?.[0] ?? 0
+  );
+
+  const soilMoisture = Number(
+    hourly?.soil_moisture_0_to_7cm?.[0] ?? 0
+  );
+
+  if (rainProbability >= 60 || precipitation > 0) {
+    insights.push({
+      type: "rain",
+      priority: "high",
+      title: "Rain expected",
+      message:
+        "Rain is likely around the current period. Keep outdoor plans flexible and carry rain protection.",
+    });
+  }
+
+  if (temperature >= 35) {
+    insights.push({
+      type: "heat",
+      priority: "high",
+      title: "High temperature",
+      message:
+        "Conditions are hot. Stay hydrated and reduce prolonged exposure during the hottest part of the day.",
+    });
+  }
+
+  if (wind >= 30) {
+    insights.push({
+      type: "wind",
+      priority: "medium",
+      title: "Strong winds",
+      message:
+        "Wind speeds are elevated. Take extra care while travelling and around exposed areas.",
+    });
+  }
+
+  if (uv >= 7) {
+    insights.push({
+      type: "uv",
+      priority: "medium",
+      title: "High UV",
+      message:
+        "UV exposure may be significant. Consider shade, sunscreen and protective clothing outdoors.",
+    });
+  }
+
+  if (humidity >= 80) {
+    insights.push({
+      type: "humidity",
+      priority: "medium",
+      title: "High humidity",
+      message:
+        "Humidity is high, which can make the air feel warmer and less comfortable.",
+    });
+  }
+
+  if (persona === "agriculture") {
+    if (rainProbability < 30 && soilMoisture < 0.25) {
+      insights.push({
+        type: "irrigation",
+        priority: "high",
+        title: "Irrigation may help",
+        message:
+          "Rain chances are limited and near-surface soil moisture is relatively low.",
+      });
+    } else {
+      insights.push({
+        type: "soil",
+        priority: "low",
+        title: "Monitor soil conditions",
+        message:
+          "Keep an eye on soil moisture as weather conditions change through the day.",
+      });
+    }
+  }
+
+  if (persona === "commuter") {
+    if (rainProbability < 30 && wind < 25) {
+      insights.push({
+        type: "good",
+        priority: "low",
+        title: "Favourable commute",
+        message:
+          "Current weather indicators suggest relatively comfortable travel conditions.",
+      });
+    }
+  }
+
+  if (persona === "traveller") {
+    if (rainProbability < 30 && temperature < 35 && wind < 25) {
+      insights.push({
+        type: "good",
+        priority: "low",
+        title: "Good conditions outdoors",
+        message:
+          "Current conditions look generally comfortable for outdoor activities.",
+      });
+    }
+  }
+
+  if (insights.length === 0) {
+    insights.push({
+      type: "good",
+      priority: "low",
+      title: "Conditions look stable",
+      message:
+        "Atmos has not detected any major weather concern for this profile.",
+    });
+  }
+
+  const priorityOrder = {
+    high: 0,
+    medium: 1,
+    low: 2,
+  };
+
+  return insights
+    .sort(
+      (a, b) =>
+        priorityOrder[a.priority] - priorityOrder[b.priority]
+    )
+    .slice(0, 5);
+}
+
+async function fetchWithTimeout(url, timeout = 10000) {
+  const controller = new AbortController();
+
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeout);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+    });
+
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchDirectWeather(latitude, longitude) {
+  const url =
+    "https://api.open-meteo.com/v1/forecast" +
+    `?latitude=${latitude}` +
+    `&longitude=${longitude}` +
+    "&current=" +
+    [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "apparent_temperature",
+      "precipitation",
+      "wind_speed_10m",
+      "uv_index",
+      "weather_code",
+      "is_day",
+    ].join(",") +
+    "&hourly=" +
+    [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "precipitation_probability",
+      "precipitation",
+      "wind_speed_10m",
+      "weather_code",
+      "is_day",
+      "soil_moisture_0_to_7cm",
+      "soil_temperature_0cm",
+    ].join(",") +
+    "&daily=" +
+    [
+      "weather_code",
+      "temperature_2m_max",
+      "temperature_2m_min",
+      "precipitation_probability_max",
+      "sunrise",
+      "sunset",
+      "uv_index_max",
+    ].join(",") +
+    "&timezone=auto";
+
+  const response = await fetchWithTimeout(url, 10000);
+
+  if (!response.ok) {
+    throw new Error(
+      `Open-Meteo returned ${response.status}`
+    );
+  }
+
+  return response.json();
+}
+
+async function fetchBackendWeather(
+  latitude,
+  longitude,
+  persona
+) {
+  const url =
+    `${BACKEND_URL}/api/personalized` +
+    `?persona=${encodeURIComponent(persona)}` +
+    `&lat=${latitude}` +
+    `&lon=${longitude}`;
+
+  const response = await fetchWithTimeout(url, 10000);
+
+  if (!response.ok) {
+    throw new Error(
+      `Backend returned ${response.status}`
+    );
+  }
+
+  return response.json();
 }
 
 async function reverseGeocode(latitude, longitude) {
-  const url =
-    `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}` +
-    `&longitude=${longitude}&language=en&format=json`;
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/reverse` +
+      `?lat=${latitude}` +
+      `&lon=${longitude}` +
+      `&format=json` +
+      `&zoom=10` +
+      `&addressdetails=1`;
 
-  const response = await fetch(url);
+    const response = await fetchWithTimeout(url, 8000);
 
-  if (!response.ok) {
-    throw new Error("Unable to resolve location");
+    if (!response.ok) {
+      throw new Error("Reverse geocoding failed");
+    }
+
+    const data = await response.json();
+    const address = data?.address || {};
+
+    return (
+      address.city ||
+      address.town ||
+      address.municipality ||
+      address.village ||
+      address.county ||
+      address.state ||
+      "Current location"
+    );
+  } catch (error) {
+    console.warn("Location name unavailable:", error);
+    return "Current location";
   }
-
-  const data = await response.json();
-  const result = data?.results?.[0];
-
-  if (!result) {
-    throw new Error("Location not found");
-  }
-
-  return {
-    name: result.name || "Unknown location",
-    admin1: result.admin1 || "",
-    country: result.country || "",
-    latitude,
-    longitude,
-  };
 }
 
-async function searchLocation(query) {
-  const url =
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}` +
-    `&count=5&language=en&format=json`;
-
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error("Location search failed");
-  }
-
-  const data = await response.json();
-
-  return (data.results || []).map((result) => ({
-    name: result.name,
-    admin1: result.admin1 || "",
-    country: result.country || "",
-    latitude: result.latitude,
-    longitude: result.longitude,
-  }));
+function AtmosLogo() {
+  return (
+    <div className="brand-icon" aria-label="Atmos">
+      <span className="logo-horizontal" />
+      <span className="logo-vertical" />
+    </div>
+  );
 }
 
 function App() {
+  const [persona, setPersona] = useState("commuter");
+
   const [page, setPage] = useState("weather");
 
-  const [location, setLocation] = useState(DEFAULT_LOCATION);
-  const [weather, setWeather] = useState(null);
+  const [location, setLocation] = useState(null);
+  const [locationName, setLocationName] = useState(
+    "Detecting location..."
+  );
 
-  const [selectedPersona, setSelectedPersona] = useState(null);
+  const [weatherData, setWeatherData] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
 
-  const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
 
-  const current = weather?.current || {};
-  const hourly = weather?.hourly || {};
-  const daily = weather?.daily || {};
+    async function detectLocation() {
+      if (!navigator.geolocation) {
+        if (cancelled) return;
 
-  const currentHourlyIndex = useMemo(
-    () => getCurrentHourlyIndex(weather),
-    [weather]
-  );
-
-  const actualIsDay = Boolean(
-    Number(current.is_day) === 1
-  );
-
-  const currentCode = Number(current.weather_code ?? 0);
-
-  const condition = weatherDescription(currentCode);
-
-  const currentIcon = weatherIcon(
-    currentCode,
-    actualIsDay
-  );
-
-  async function loadWeather(
-    latitude = location.latitude,
-    longitude = location.longitude,
-    persona = selectedPersona
-  ) {
-    setLoading(true);
-    setError("");
-
-    try {
-      const personaQuery = persona
-        ? `&persona=${encodeURIComponent(persona)}`
-        : "";
-
-      const url =
-        `${BACKEND_URL}/api/personalized?lat=${latitude}&lon=${longitude}` +
-        personaQuery;
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(
-          `Weather server returned ${response.status}`
-        );
+        setLocation(DEFAULT_LOCATION);
+        setLocationName("New Delhi");
+        return;
       }
 
-      const data = await response.json();
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          if (cancelled) return;
 
-      if (!data?.current && !data?.weather?.current) {
-        throw new Error("Invalid weather response");
-      }
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
 
-      const normalizedWeather = data.current
-        ? data
-        : data.weather;
+          setLocation({
+            latitude,
+            longitude,
+          });
 
-      setWeather(normalizedWeather);
-    } catch (err) {
-      console.error(err);
-      setError(
-        "Unable to load weather right now. Please try again."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function useMyLocation() {
-    if (!navigator.geolocation) {
-      await loadWeather();
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-
-        try {
-          const resolved = await reverseGeocode(
+          const name = await reverseGeocode(
             latitude,
             longitude
           );
 
-          setLocation(resolved);
+          if (!cancelled) {
+            setLocationName(name);
+          }
+        },
+        () => {
+          if (cancelled) return;
 
-          await loadWeather(
-            latitude,
-            longitude,
-            selectedPersona
-          );
-        } catch (err) {
-          console.error(err);
-          await loadWeather(latitude, longitude);
+          setLocation(DEFAULT_LOCATION);
+          setLocationName("New Delhi");
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 300000,
         }
-      },
-      async () => {
-        await loadWeather();
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000,
-      }
-    );
-  }
-
-  async function performSearch(event) {
-    event?.preventDefault();
-
-    const query = searchText.trim();
-
-    if (!query) return;
-
-    setSearching(true);
-    setError("");
-
-    try {
-      const results = await searchLocation(query);
-
-      setSearchResults(results);
-
-      if (results.length === 1) {
-        await selectLocation(results[0]);
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Could not find that location.");
-    } finally {
-      setSearching(false);
+      );
     }
-  }
 
-  async function selectLocation(nextLocation) {
-    setLocation(nextLocation);
-    setSearchResults([]);
-    setSearchText("");
+    detectLocation();
 
-    await loadWeather(
-      nextLocation.latitude,
-      nextLocation.longitude,
-      selectedPersona
-    );
-  }
-
-  function choosePersona(persona) {
-    setSelectedPersona(persona);
-    setPage("personalized");
-  }
-
-  function goToPersonaSelection() {
-    setPage("personas");
-  }
-
-  function goBackToWeather() {
-    setPage("weather");
-  }
-
-  useEffect(() => {
-    useMyLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!selectedPersona || page !== "personalized") return;
+    if (!location) return;
 
-    loadWeather(
-      location.latitude,
-      location.longitude,
-      selectedPersona
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPersona]);
+    let cancelled = false;
 
-  if (loading && !weather) {
+    async function loadWeather() {
+      setLoading(true);
+      setError("");
+
+      try {
+        let data;
+
+        // Try Render backend first.
+        try {
+          data = await fetchBackendWeather(
+            location.latitude,
+            location.longitude,
+            persona
+          );
+
+          // Make sure backend actually returned weather.
+          if (!data?.current && !data?.weather) {
+            throw new Error(
+              "Backend response did not contain weather data"
+            );
+          }
+        } catch (backendError) {
+          console.warn(
+            "Backend unavailable. Using Open-Meteo directly.",
+            backendError
+          );
+
+          // Direct fallback means the frontend still works
+          // even when Render is sleeping/down.
+          const directWeather = await fetchDirectWeather(
+            location.latitude,
+            location.longitude
+          );
+
+          data = {
+            persona,
+            current: directWeather.current,
+            weather: directWeather.current,
+            hourly: directWeather.hourly,
+            daily: directWeather.daily,
+            timezone: directWeather.timezone,
+            timezone_abbreviation:
+              directWeather.timezone_abbreviation,
+            latitude: directWeather.latitude,
+            longitude: directWeather.longitude,
+            insights: buildLocalInsights(
+              persona,
+              directWeather
+            ),
+          };
+        }
+
+        if (cancelled) return;
+
+        // Normalize both possible backend structures.
+        const normalized = {
+          ...data,
+          current:
+            data.current ||
+            data.weather ||
+            {},
+          weather:
+            data.current ||
+            data.weather ||
+            {},
+          hourly: data.hourly || {},
+          daily: data.daily || {},
+          insights:
+            Array.isArray(data.insights)
+              ? data.insights
+              : buildLocalInsights(persona, data),
+        };
+
+        setWeatherData(normalized);
+      } catch (err) {
+        console.error("Weather loading failed:", err);
+
+        if (!cancelled) {
+          setError(
+            "Unable to load live weather. Please check your internet connection and try again."
+          );
+          setWeatherData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadWeather();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location, persona]);
+
+  const weather = weatherData?.current || {};
+  const hourly = weatherData?.hourly || {};
+  const daily = weatherData?.daily || {};
+
+  const insights = Array.isArray(weatherData?.insights)
+    ? weatherData.insights
+    : [];
+
+  const currentTemperature = Number(
+    weather?.temperature_2m ?? 0
+  );
+
+  const apparentTemperature = Number(
+    weather?.apparent_temperature ??
+      currentTemperature
+  );
+
+  const humidity = Number(
+    weather?.relative_humidity_2m ?? 0
+  );
+
+  const precipitation = Number(
+    weather?.precipitation ?? 0
+  );
+
+  const wind = Number(
+    weather?.wind_speed_10m ?? 0
+  );
+
+  const uv = Number(weather?.uv_index ?? 0);
+
+  const weatherCode = Number(
+    weather?.weather_code ?? 0
+  );
+
+  const isDay = Number(weather?.is_day ?? 1);
+
+  const conditionIcon = getWeatherIcon(
+    weatherCode,
+    isDay
+  );
+
+  const conditionLabel = getWeatherDescription(
+    weatherCode,
+    isDay
+  );
+
+  const selectedPersona = PERSONAS.find(
+    (item) => item.id === persona
+  );
+
+  const soilMoisture =
+    hourly?.soil_moisture_0_to_7cm?.[0] ??
+    null;
+
+  const soilTemperature =
+    hourly?.soil_temperature_0cm?.[0] ??
+    null;
+
+  const sunrise = daily?.sunrise?.[0];
+  const sunset = daily?.sunset?.[0];
+
+  const hourlyForecast = useMemo(() => {
+    const times = Array.isArray(hourly.time)
+      ? hourly.time
+      : [];
+
+    const temperatures = Array.isArray(
+      hourly.temperature_2m
+    )
+      ? hourly.temperature_2m
+      : [];
+
+    const rainProbabilities = Array.isArray(
+      hourly.precipitation_probability
+    )
+      ? hourly.precipitation_probability
+      : [];
+
+    const codes = Array.isArray(
+      hourly.weather_code
+    )
+      ? hourly.weather_code
+      : [];
+
+    const dayFlags = Array.isArray(hourly.is_day)
+      ? hourly.is_day
+      : [];
+
+    // Find current hour instead of blindly showing
+    // midnight / old hours.
+    let startIndex = 0;
+
+    if (weatherData?.current?.time) {
+      const currentTime = new Date(
+        weatherData.current.time
+      ).getTime();
+
+      let closestDifference = Infinity;
+
+      times.forEach((time, index) => {
+        const difference = Math.abs(
+          new Date(time).getTime() - currentTime
+        );
+
+        if (difference < closestDifference) {
+          closestDifference = difference;
+          startIndex = index;
+        }
+      });
+    }
+
+    return times
+      .slice(startIndex, startIndex + 12)
+      .map((time, offset) => {
+        const index = startIndex + offset;
+
+        return {
+          time,
+          temperature: temperatures[index],
+          rainProbability:
+            rainProbabilities[index],
+          weatherCode: codes[index],
+          isDay: dayFlags[index],
+        };
+      });
+  }, [hourly, weatherData]);
+
+  const dailyForecast = useMemo(() => {
+    const times = Array.isArray(daily.time)
+      ? daily.time
+      : [];
+
+    const maxTemperatures = Array.isArray(
+      daily.temperature_2m_max
+    )
+      ? daily.temperature_2m_max
+      : [];
+
+    const minTemperatures = Array.isArray(
+      daily.temperature_2m_min
+    )
+      ? daily.temperature_2m_min
+      : [];
+
+    const rainProbabilities = Array.isArray(
+      daily.precipitation_probability_max
+    )
+      ? daily.precipitation_probability_max
+      : [];
+
+    const codes = Array.isArray(
+      daily.weather_code
+    )
+      ? daily.weather_code
+      : [];
+
+    return times.slice(0, 5).map((time, index) => ({
+      time,
+      maxTemperature:
+        maxTemperatures[index],
+      minTemperature:
+        minTemperatures[index],
+      rainProbability:
+        rainProbabilities[index],
+      weatherCode: codes[index],
+    }));
+  }, [daily]);
+
+  function selectPersona(id) {
+    setPersona(id);
+    setPage("personalized");
+  }
+
+  function goToWeather() {
+    setPage("weather");
+  }
+
+  function goToPersonas() {
+    setPage("personas");
+  }
+
+  if (loading && !weatherData) {
     return (
-      <div className="app-shell loading-screen">
+      <div className="loading-screen">
         <div className="loading-card">
-          <div className="loading-logo">
-            <span />
-          </div>
+          <AtmosLogo />
 
-          <div>
-            <h1>Atmos</h1>
-            <p>Reading the atmosphere...</p>
-          </div>
+          <div className="loading-spinner" />
+
+          <h2>Preparing your weather</h2>
+
+          <p>
+            Atmos is checking live conditions for
+            your location.
+          </p>
         </div>
       </div>
     );
   }
 
-  const temperature = Math.round(
-    Number(current.temperature_2m ?? 0)
-  );
+  if (error && !weatherData) {
+    return (
+      <div className="error-screen">
+        <div className="error-card">
+          <div className="error-icon">⚠️</div>
 
-  const apparentTemperature = Math.round(
-    Number(current.apparent_temperature ?? temperature)
-  );
+          <h2>Weather unavailable</h2>
 
-  const humidity = Math.round(
-    Number(current.relative_humidity_2m ?? 0)
-  );
+          <p>{error}</p>
 
-  const wind = Math.round(
-    Number(current.wind_speed_10m ?? 0)
-  );
-
-  const uv = Number(current.uv_index ?? 0);
-
-  const todayHigh = Math.round(
-    Number(daily.temperature_2m_max?.[0] ?? temperature)
-  );
-
-  const todayLow = Math.round(
-    Number(daily.temperature_2m_min?.[0] ?? temperature)
-  );
-
-  const rainChance = Math.round(
-    Number(
-      daily.precipitation_probability_max?.[0] ??
-      hourly.precipitation_probability?.[currentHourlyIndex] ??
-      0
-    )
-  );
-
-  const personalizedInsights =
-    weather?.insights ||
-    [];
+          <button
+            className="primary-button"
+            onClick={() => window.location.reload()}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
+    <div className="app">
+      <header className="header">
         <button
           className="brand"
-          onClick={goBackToWeather}
-          aria-label="Atmos home"
+          onClick={goToWeather}
+          aria-label="Go to current weather"
         >
-          <div className="brand-icon">
-            <span />
-          </div>
+          <AtmosLogo />
 
-          <span className="brand-name">
-            Atmos
-          </span>
-        </button>
-
-        <form
-          className="location-search"
-          onSubmit={performSearch}
-        >
-          <span className="search-symbol">⌕</span>
-
-          <input
-            value={searchText}
-            onChange={(event) =>
-              setSearchText(event.target.value)
-            }
-            placeholder="Search city..."
-            aria-label="Search city"
-          />
-
-          {searching && (
-            <span className="search-status">
-              ...
+          <div>
+            <h1>Atmos</h1>
+            <span>
+              Adaptive weather intelligence
             </span>
-          )}
-        </form>
-
-        <button
-          className="location-button"
-          onClick={useMyLocation}
-        >
-          <span>⌖</span>
-          <span className="location-button-text">
-            My location
-          </span>
+          </div>
         </button>
+
+        <div className="location">
+          <span className="location-icon">
+            📍
+          </span>
+
+          <div>
+            <small>YOUR LOCATION</small>
+            <strong>{locationName}</strong>
+          </div>
+        </div>
       </header>
 
-      {searchResults.length > 0 && (
-        <div className="search-results">
-          {searchResults.map((result, index) => (
-            <button
-              key={`${result.latitude}-${result.longitude}-${index}`}
-              onClick={() => selectLocation(result)}
-              className="search-result"
-            >
-              <strong>
-                {result.name}
-              </strong>
-
-              <span>
-                {[result.admin1, result.country]
-                  .filter(Boolean)
-                  .join(", ")}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
       {error && (
-        <div className="error-banner">
-          {error}
+        <div className="notice">
+          <span>⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
-      <main className="page-container">
-        {page === "weather" && (
-          <section className="page weather-page">
-            <div className="page-heading">
+      <nav className="page-nav">
+        <button
+          className={
+            page === "weather" ? "active" : ""
+          }
+          onClick={goToWeather}
+        >
+          Current Weather
+        </button>
+
+        <button
+          className={
+            page === "personas" ? "active" : ""
+          }
+          onClick={goToPersonas}
+        >
+          Choose Purpose
+        </button>
+
+        <button
+          className={
+            page === "personalized" ? "active" : ""
+          }
+          onClick={() => setPage("personalized")}
+        >
+          My Weather
+        </button>
+      </nav>
+
+      {page === "weather" && (
+        <main className="page">
+          <section className="hero-card">
+            <div className="hero-content">
               <div>
-                <span className="eyebrow">
-                  CURRENT WEATHER
-                </span>
+                <p className="eyebrow">
+                  CURRENT CONDITIONS
+                </p>
 
                 <h2>
-                  {getLocationLabel(location)}
+                  {currentTemperature.toFixed(1)}°
                 </h2>
 
-                <p>
-                  {location.country || "Selected location"}
+                <div className="condition">
+                  <span>{conditionIcon}</span>
+                  <span>{conditionLabel}</span>
+                </div>
+
+                <p className="feels-like">
+                  Feels like{" "}
+                  {apparentTemperature.toFixed(1)}°
                 </p>
               </div>
 
-              <div className="live-status">
-                <span className="status-dot" />
-                Live conditions
+              <div className="hero-weather-icon">
+                {conditionIcon}
               </div>
             </div>
 
-            <section className="weather-hero">
-              <div className="hero-main">
-                <div className="hero-icon">
-                  {currentIcon}
-                </div>
+            <div className="hero-bottom">
+              <div>
+                <span>Humidity</span>
+                <strong>{humidity}%</strong>
+              </div>
 
+              <div>
+                <span>Rainfall</span>
+                <strong>
+                  {precipitation.toFixed(1)} mm
+                </strong>
+              </div>
+
+              <div>
+                <span>Wind</span>
+                <strong>
+                  {wind.toFixed(1)} km/h
+                </strong>
+              </div>
+
+              <div>
+                <span>UV Index</span>
+                <strong>
+                  {uv.toFixed(1)}
+                </strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="section">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">
+                  FORECAST
+                </p>
+                <h2>Next 5 days</h2>
+              </div>
+
+              <span>
+                {locationName}
+              </span>
+            </div>
+
+            <div className="daily-grid">
+              {dailyForecast.map((day, index) => (
+                <article
+                  className="day-card"
+                  key={day.time}
+                >
+                  <span className="day-name">
+                    {getDayLabel(
+                      day.time,
+                      index
+                    )}
+                  </span>
+
+                  <span className="day-icon">
+                    {getForecastIcon(
+                      day.rainProbability,
+                      day.maxTemperature,
+                      day.weatherCode,
+                      1
+                    )}
+                  </span>
+
+                  <strong className="day-temperature">
+                    {day.maxTemperature !==
+                    undefined
+                      ? `${Math.round(
+                          day.maxTemperature
+                        )}°`
+                      : "--"}
+                  </strong>
+
+                  <span className="day-min">
+                    {day.minTemperature !==
+                    undefined
+                      ? `${Math.round(
+                          day.minTemperature
+                        )}°`
+                      : "--"}
+                  </span>
+
+                  <span className="day-rain">
+                    {day.rainProbability !==
+                    undefined
+                      ? `${day.rainProbability}% rain`
+                      : "--"}
+                  </span>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="two-column">
+            <div className="panel">
+              <div className="panel-heading">
                 <div>
-                  <div className="temperature">
-                    {temperature}
-                    <span>°C</span>
-                  </div>
-
-                  <div className="condition">
-                    {condition}
-                  </div>
-
-                  <div className="feels-like">
-                    Feels like {apparentTemperature}°C
-                  </div>
+                  <p className="eyebrow">
+                    HOURLY
+                  </p>
+                  <h2>Coming up</h2>
                 </div>
               </div>
 
-              <div className="hero-summary">
+              <div className="hourly-container">
+                {hourlyForecast.map((hour) => (
+                  <div
+                    className="hour-card"
+                    key={hour.time}
+                  >
+                    <span className="hour-time">
+                      {getTimeLabel(hour.time)}
+                    </span>
+
+                    <span className="hour-icon">
+                      {getForecastIcon(
+                        hour.rainProbability,
+                        hour.temperature,
+                        hour.weatherCode,
+                        hour.isDay
+                      )}
+                    </span>
+
+                    <strong>
+                      {hour.temperature !==
+                      undefined
+                        ? `${Math.round(
+                            hour.temperature
+                          )}°`
+                        : "--"}
+                    </strong>
+
+                    <small>
+                      {hour.rainProbability !==
+                      undefined
+                        ? `${hour.rainProbability}%`
+                        : "--"}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
                 <div>
-                  <span>Today's range</span>
+                  <p className="eyebrow">
+                    SOLAR
+                  </p>
+                  <h2>Sun today</h2>
+                </div>
+
+                <span className="panel-icon">
+                  {isDay === 1
+                    ? "☀️"
+                    : "🌙"}
+                </span>
+              </div>
+
+              <div className="sun-times">
+                <div>
+                  <small>Sunrise</small>
                   <strong>
-                    {todayHigh}° / {todayLow}°
+                    {getTimeLabel(sunrise)}
                   </strong>
                 </div>
 
                 <div>
-                  <span>Rain chance</span>
-                  <strong>{rainChance}%</strong>
+                  <small>Sunset</small>
+                  <strong>
+                    {getTimeLabel(sunset)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="cta-card">
+            <div>
+              <p className="eyebrow">
+                PERSONALIZATION
+              </p>
+
+              <h2>
+                Want weather that matters to you?
+              </h2>
+
+              <p>
+                Choose your purpose and Atmos will
+                turn weather data into useful advice.
+              </p>
+            </div>
+
+            <button
+              className="primary-button"
+              onClick={goToPersonas}
+            >
+              Choose purpose →
+            </button>
+          </section>
+        </main>
+      )}
+
+      {page === "personas" && (
+        <main className="page">
+          <section className="page-intro">
+            <p className="eyebrow">
+              PERSONALIZATION
+            </p>
+
+            <h2>What matters to you?</h2>
+
+            <p>
+              Atmos adapts weather information to
+              the way you use it.
+            </p>
+          </section>
+
+          <section className="persona-grid">
+            {PERSONAS.map((item) => (
+              <button
+                className={`persona-card ${
+                  persona === item.id
+                    ? "selected"
+                    : ""
+                }`}
+                key={item.id}
+                onClick={() =>
+                  selectPersona(item.id)
+                }
+              >
+                <span className="persona-icon">
+                  {item.icon}
+                </span>
+
+                <span className="persona-copy">
+                  <strong>{item.title}</strong>
+                  <small>
+                    {item.description}
+                  </small>
+                </span>
+
+                <span className="persona-arrow">
+                  →
+                </span>
+              </button>
+            ))}
+          </section>
+        </main>
+      )}
+
+      {page === "personalized" && (
+        <main className="page">
+          <section className="personalized-hero">
+            <div>
+              <p className="eyebrow">
+                PERSONALIZED WEATHER
+              </p>
+
+              <div className="profile-title">
+                <span>
+                  {selectedPersona?.icon}
+                </span>
+
+                <div>
+                  <h2>
+                    {selectedPersona?.title}
+                  </h2>
+
+                  <p>
+                    Weather insights for{" "}
+                    {locationName}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              className="secondary-button"
+              onClick={goToPersonas}
+            >
+              Change purpose
+            </button>
+          </section>
+
+          <section className="section">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">
+                  ADVISORY
+                </p>
+
+                <h2>
+                  What you should know
+                </h2>
+              </div>
+
+              <span>
+                {insights.length} insights
+              </span>
+            </div>
+
+            <div className="insight-grid">
+              {insights.map((insight, index) => (
+                <article
+                  className={`insight-card ${getInsightClass(
+                    insight.priority
+                  )}`}
+                  key={`${insight.type}-${index}`}
+                >
+                  <div className="insight-icon">
+                    {getInsightIcon(
+                      insight.type
+                    )}
+                  </div>
+
+                  <div className="insight-content">
+                    <div className="insight-header">
+                      <h3>
+                        {insight.title}
+                      </h3>
+
+                      <span
+                        className={`priority-badge ${insight.priority}`}
+                      >
+                        {insight.priority}
+                      </span>
+                    </div>
+
+                    <p>
+                      {insight.message ||
+                        insight.description}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="two-column">
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">
+                    ATMOSPHERE
+                  </p>
+                  <h2>
+                    Current snapshot
+                  </h2>
+                </div>
+
+                <span className="panel-icon">
+                  {conditionIcon}
+                </span>
+              </div>
+
+              <div className="snapshot-list">
+                <div>
+                  <span>Condition</span>
+                  <strong>
+                    {conditionLabel}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Temperature</span>
+                  <strong>
+                    {currentTemperature.toFixed(
+                      1
+                    )}
+                    °
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Feels like</span>
+                  <strong>
+                    {apparentTemperature.toFixed(
+                      1
+                    )}
+                    °
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Humidity</span>
+                  <strong>
+                    {humidity}%
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Wind speed</span>
+                  <strong>
+                    {wind.toFixed(1)} km/h
+                  </strong>
                 </div>
 
                 <div>
                   <span>UV index</span>
-                  <strong>{uv.toFixed(1)}</strong>
+                  <strong>
+                    {uv.toFixed(1)}
+                  </strong>
                 </div>
-              </div>
-            </section>
-
-            <section className="metrics-grid">
-              <Metric
-                label="Humidity"
-                value={`${humidity}%`}
-                symbol="◌"
-              />
-
-              <Metric
-                label="Wind"
-                value={`${wind} km/h`}
-                symbol="↗"
-              />
-
-              <Metric
-                label="Precipitation"
-                value={`${Number(
-                  current.precipitation ?? 0
-                ).toFixed(1)} mm`}
-                symbol="⌁"
-              />
-
-              <Metric
-                label="Atmosphere"
-                value={
-                  actualIsDay
-                    ? "Daytime"
-                    : "Nighttime"
-                }
-                symbol={
-                  actualIsDay
-                    ? "☀"
-                    : "☾"
-                }
-              />
-            </section>
-
-            <section className="forecast-section">
-              <div className="section-title">
-                <div>
-                  <span className="eyebrow">
-                    FORECAST
-                  </span>
-                  <h3>Next few days</h3>
-                </div>
-              </div>
-
-              <div className="daily-grid">
-                {(daily.time || [])
-                  .slice(0, 5)
-                  .map((day, index) => {
-                    const code =
-                      daily.weather_code?.[index];
-
-                    return (
-                      <div
-                        className="day-card"
-                        key={day}
-                      >
-                        <span className="day-name">
-                          {formatDay(day, index)}
-                        </span>
-
-                        <span className="day-icon">
-                          {weatherIcon(
-                            code,
-                            index === 0
-                              ? actualIsDay
-                              : true
-                          )}
-                        </span>
-
-                        <strong>
-                          {Math.round(
-                            daily.temperature_2m_max?.[
-                              index
-                            ] ?? 0
-                          )}
-                          °
-                        </strong>
-
-                        <span className="day-low">
-                          {Math.round(
-                            daily.temperature_2m_min?.[
-                              index
-                            ] ?? 0
-                          )}
-                          °
-                        </span>
-
-                        <span className="day-rain">
-                          {Math.round(
-                            daily
-                              .precipitation_probability_max?.[
-                              index
-                            ] ?? 0
-                          )}
-                          % rain
-                        </span>
-                      </div>
-                    );
-                  })}
-              </div>
-            </section>
-
-            <section className="hourly-section">
-              <div className="section-title">
-                <div>
-                  <span className="eyebrow">
-                    HOURLY
-                  </span>
-                  <h3>Coming up</h3>
-                </div>
-              </div>
-
-              <div className="hourly-scroll">
-                {(hourly.time || [])
-                  .slice(
-                    currentHourlyIndex,
-                    currentHourlyIndex + 8
-                  )
-                  .map((time, visibleIndex) => {
-                    const index =
-                      currentHourlyIndex +
-                      visibleIndex;
-
-                    const code =
-                      hourly.weather_code?.[index];
-
-                    const hourIsDay =
-                      hourly.is_day?.[index] !== undefined
-                        ? Number(
-                            hourly.is_day[index]
-                          ) === 1
-                        : actualIsDay;
-
-                    return (
-                      <div
-                        className="hour-card"
-                        key={time}
-                      >
-                        <span>
-                          {visibleIndex === 0
-                            ? "Now"
-                            : formatHour(time)}
-                        </span>
-
-                        <div className="hour-icon">
-                          {weatherIcon(
-                            code,
-                            hourIsDay
-                          )}
-                        </div>
-
-                        <strong>
-                          {Math.round(
-                            hourly.temperature_2m?.[
-                              index
-                            ] ?? 0
-                          )}
-                          °
-                        </strong>
-
-                        <small>
-                          {Math.round(
-                            hourly
-                              .precipitation_probability?.[
-                              index
-                            ] ?? 0
-                          )}
-                          %
-                        </small>
-                      </div>
-                    );
-                  })}
-              </div>
-            </section>
-
-            <section className="personalize-callout">
-              <div>
-                <span className="eyebrow">
-                  MAKE IT PERSONAL
-                </span>
-
-                <h3>
-                  Weather that works for you.
-                </h3>
-
-                <p>
-                  Choose what matters to you and
-                  Atmos will turn the forecast into
-                  useful advice.
-                </p>
-              </div>
-
-              <button
-                className="primary-button"
-                onClick={goToPersonaSelection}
-              >
-                Personalize weather →
-              </button>
-            </section>
-          </section>
-        )}
-
-        {page === "personas" && (
-          <section className="page persona-page">
-            <button
-              className="back-button"
-              onClick={goBackToWeather}
-            >
-              ← Current weather
-            </button>
-
-            <div className="persona-heading">
-              <span className="eyebrow">
-                PERSONALIZATION
-              </span>
-
-              <h2>
-                What are you using Atmos for?
-              </h2>
-
-              <p>
-                Choose a purpose and we'll tailor
-                the weather information to you.
-              </p>
-            </div>
-
-            <div className="persona-grid">
-              {Object.entries(PERSONAS).map(
-                ([key, persona]) => (
-                  <button
-                    className="persona-card"
-                    key={key}
-                    onClick={() =>
-                      choosePersona(key)
-                    }
-                  >
-                    <span className="persona-icon">
-                      {persona.icon}
-                    </span>
-
-                    <div>
-                      <h3>{persona.title}</h3>
-
-                      <p>
-                        {persona.description}
-                      </p>
-                    </div>
-
-                    <span className="persona-arrow">
-                      →
-                    </span>
-                  </button>
-                )
-              )}
-            </div>
-          </section>
-        )}
-
-        {page === "personalized" && (
-          <section className="page personalized-page">
-            <button
-              className="back-button"
-              onClick={goToPersonaSelection}
-            >
-              ← Change purpose
-            </button>
-
-            <div className="personalized-heading">
-              <div>
-                <span className="eyebrow">
-                  PERSONALIZED FOR
-                </span>
-
-                <h2>
-                  {PERSONAS[selectedPersona]?.title}
-                </h2>
-
-                <p>
-                  {getLocationLabel(location)}
-                </p>
-              </div>
-
-              <div className="personalized-current">
-                <span className="mini-weather-icon">
-                  {currentIcon}
-                </span>
-
-                <strong>
-                  {temperature}°
-                </strong>
-
-                <span>
-                  {condition}
-                </span>
               </div>
             </div>
 
-            <section className="insights-section">
-              <div className="section-title">
+            <div className="panel">
+              <div className="panel-heading">
                 <div>
-                  <span className="eyebrow">
-                    YOUR WEATHER
-                  </span>
+                  <p className="eyebrow">
+                    RELATED
+                  </p>
 
-                  <h3>
-                    Today's useful insights
-                  </h3>
+                  <h2>
+                    {persona === "agriculture"
+                      ? "Growing conditions"
+                      : persona === "commuter"
+                      ? "Travel conditions"
+                      : "Outdoor comfort"}
+                  </h2>
                 </div>
+
+                <span className="panel-icon">
+                  {persona === "agriculture"
+                    ? "🌱"
+                    : persona === "commuter"
+                    ? "🚗"
+                    : "✈️"}
+                </span>
               </div>
 
-              {personalizedInsights.length > 0 ? (
-                <div className="insights-grid">
-                  {personalizedInsights.map(
-                    (insight, index) => (
-                      <article
-                        className={`insight-card ${
-                          insight.priority || ""
-                        }`}
-                        key={index}
-                      >
-                        <div className="insight-number">
-                          {String(index + 1).padStart(
-                            2,
-                            "0"
-                          )}
-                        </div>
+              {persona === "agriculture" ? (
+                <div className="soil-metrics">
+                  <div>
+                    <small>
+                      Soil moisture
+                    </small>
 
-                        <div>
-                          <span className="insight-priority">
-                            {insight.priority ||
-                              "INFO"}
-                          </span>
+                    <strong>
+                      {soilMoisture !== null
+                        ? `${(
+                            Number(
+                              soilMoisture
+                            ) * 100
+                          ).toFixed(0)}%`
+                        : "--"}
+                    </strong>
+                  </div>
 
-                          <p>
-                            {insight.message ||
-                              insight.text ||
-                              insight}
-                          </p>
-                        </div>
-                      </article>
-                    )
-                  )}
+                  <div>
+                    <small>
+                      Soil temperature
+                    </small>
+
+                    <strong>
+                      {soilTemperature !== null
+                        ? `${Number(
+                            soilTemperature
+                          ).toFixed(1)}°`
+                        : "--"}
+                    </strong>
+                  </div>
                 </div>
               ) : (
-                <div className="empty-insights">
-                  Personalized insights are being
-                  prepared for this weather.
+                <div className="related-info">
+                  <div>
+                    <span>Rain chance</span>
+                    <strong>
+                      {hourly?.precipitation_probability?.[0] ??
+                        0}
+                      %
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Current wind</span>
+                    <strong>
+                      {wind.toFixed(1)} km/h
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Humidity</span>
+                    <strong>
+                      {humidity}%
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>UV index</span>
+                    <strong>
+                      {uv.toFixed(1)}
+                    </strong>
+                  </div>
                 </div>
               )}
-            </section>
+            </div>
+          </section>
 
-            <section className="related-grid">
-              <div className="related-card">
-                <span className="eyebrow">
-                  CONDITIONS
-                </span>
+          <section className="section">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">
+                  HOURLY
+                </p>
 
-                <h3>
-                  What the atmosphere is doing
-                </h3>
-
-                <div className="related-values">
-                  <InfoRow
-                    label="Temperature"
-                    value={`${temperature}°C`}
-                  />
-
-                  <InfoRow
-                    label="Feels like"
-                    value={`${apparentTemperature}°C`}
-                  />
-
-                  <InfoRow
-                    label="Humidity"
-                    value={`${humidity}%`}
-                  />
-
-                  <InfoRow
-                    label="Wind"
-                    value={`${wind} km/h`}
-                  />
-                </div>
+                <h2>
+                  Plan ahead
+                </h2>
               </div>
+            </div>
 
-              <div className="related-card">
-                <span className="eyebrow">
-                  TODAY
-                </span>
-
-                <h3>
-                  Things worth knowing
-                </h3>
-
-                <div className="related-values">
-                  <InfoRow
-                    label="High"
-                    value={`${todayHigh}°C`}
-                  />
-
-                  <InfoRow
-                    label="Low"
-                    value={`${todayLow}°C`}
-                  />
-
-                  <InfoRow
-                    label="Rain probability"
-                    value={`${rainChance}%`}
-                  />
-
-                  <InfoRow
-                    label="UV"
-                    value={uv.toFixed(1)}
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="personalized-forecast">
-              <div className="section-title">
-                <div>
-                  <span className="eyebrow">
-                    RELATED FORECAST
+            <div className="hourly-container">
+              {hourlyForecast.map((hour) => (
+                <div
+                  className="hour-card"
+                  key={hour.time}
+                >
+                  <span className="hour-time">
+                    {getTimeLabel(hour.time)}
                   </span>
 
-                  <h3>
-                    Plan around the next few days
-                  </h3>
+                  <span className="hour-icon">
+                    {getForecastIcon(
+                      hour.rainProbability,
+                      hour.temperature,
+                      hour.weatherCode,
+                      hour.isDay
+                    )}
+                  </span>
+
+                  <strong>
+                    {hour.temperature !==
+                    undefined
+                      ? `${Math.round(
+                          hour.temperature
+                        )}°`
+                      : "--"}
+                  </strong>
+
+                  <small>
+                    {hour.rainProbability !==
+                    undefined
+                      ? `${hour.rainProbability}% rain`
+                      : "--"}
+                  </small>
                 </div>
-              </div>
-
-              <div className="compact-forecast">
-                {(daily.time || [])
-                  .slice(0, 5)
-                  .map((day, index) => (
-                    <div
-                      className="compact-day"
-                      key={day}
-                    >
-                      <span>
-                        {formatDay(day, index)}
-                      </span>
-
-                      <span>
-                        {weatherIcon(
-                          daily.weather_code?.[
-                            index
-                          ],
-                          index === 0
-                            ? actualIsDay
-                            : true
-                        )}
-                      </span>
-
-                      <strong>
-                        {Math.round(
-                          daily.temperature_2m_max?.[
-                            index
-                          ] ?? 0
-                        )}
-                        °
-                      </strong>
-                    </div>
-                  ))}
-              </div>
-            </section>
-
-            <button
-              className="secondary-button"
-              onClick={goBackToWeather}
-            >
-              ← Back to current weather
-            </button>
+              ))}
+            </div>
           </section>
-        )}
-      </main>
+        </main>
+      )}
 
-      <footer className="app-footer">
-        <span>Atmos</span>
-        <span>Weather, made useful.</span>
+      <footer className="footer">
+        <strong>Atmos</strong>
+        <span>
+          Personalized weather intelligence
+        </span>
       </footer>
-    </div>
-  );
-}
-
-function Metric({ label, value, symbol }) {
-  return (
-    <div className="metric-card">
-      <span className="metric-symbol">
-        {symbol}
-      </span>
-
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }) {
-  return (
-    <div className="info-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }

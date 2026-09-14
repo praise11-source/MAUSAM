@@ -1,7 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 
-const { getPersonalizedInsights } = require("./personalization");
+const {
+  getPersonalizedInsights,
+} = require("./personalization");
 
 const app = express();
 
@@ -61,7 +63,9 @@ async function getWeather(latitude, longitude) {
   return await response.json();
 }
 
-/* ---------------- WEATHER ---------------- */
+/* --------------------------------
+   BASIC WEATHER
+-------------------------------- */
 
 app.get("/api/weather", async (req, res) => {
   try {
@@ -73,7 +77,8 @@ app.get("/api/weather", async (req, res) => {
       !Number.isFinite(longitude)
     ) {
       return res.status(400).json({
-        error: "Valid latitude and longitude are required",
+        error:
+          "Valid latitude and longitude are required.",
       });
     }
 
@@ -84,75 +89,118 @@ app.get("/api/weather", async (req, res) => {
 
     res.json(weather);
   } catch (error) {
-    console.error("Weather error:", error);
-
-    res.status(500).json({
-      error: "Unable to fetch weather",
-    });
-  }
-});
-
-/* ---------------- PERSONALIZED ---------------- */
-
-app.get("/api/personalized", async (req, res) => {
-  try {
-    const latitude = Number(req.query.lat);
-    const longitude = Number(req.query.lon);
-
-    const persona =
-      req.query.persona || "commuter";
-
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude)
-    ) {
-      return res.status(400).json({
-        error: "Valid latitude and longitude are required",
-      });
-    }
-
-    const weather = await getWeather(
-      latitude,
-      longitude
-    );
-
-    const insights = getPersonalizedInsights(
-      persona,
-      weather
-    );
-
-    res.json({
-      persona,
-      current: weather.current,
-      hourly: weather.hourly,
-      daily: weather.daily,
-      timezone: weather.timezone,
-      timezone_abbreviation:
-        weather.timezone_abbreviation,
-      latitude: weather.latitude,
-      longitude: weather.longitude,
-      insights,
-    });
-  } catch (error) {
     console.error(
-      "Personalized weather error:",
+      "Weather API error:",
       error
     );
 
     res.status(500).json({
-      error: "Unable to generate personalized weather",
+      error: "Unable to fetch weather.",
+      message: error.message,
     });
   }
 });
 
+/* --------------------------------
+   PERSONALIZED WEATHER
+-------------------------------- */
+
+app.get(
+  "/api/personalized",
+  async (req, res) => {
+    try {
+      const latitude = Number(req.query.lat);
+      const longitude = Number(req.query.lon);
+
+      const persona =
+        String(req.query.persona || "commuter");
+
+      const allowedPersonas = [
+        "commuter",
+        "traveller",
+        "agriculture",
+      ];
+
+      const selectedPersona =
+        allowedPersonas.includes(persona)
+          ? persona
+          : "commuter";
+
+      if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude)
+      ) {
+        return res.status(400).json({
+          error:
+            "Valid latitude and longitude are required.",
+        });
+      }
+
+      const weather = await getWeather(
+        latitude,
+        longitude
+      );
+
+      const insights =
+        getPersonalizedInsights(
+          selectedPersona,
+          weather
+        );
+
+      res.json({
+        persona: selectedPersona,
+
+        current: weather.current,
+
+        weather: weather.current,
+
+        hourly: weather.hourly,
+
+        daily: weather.daily,
+
+        timezone: weather.timezone,
+
+        timezone_abbreviation:
+          weather.timezone_abbreviation,
+
+        latitude: weather.latitude,
+
+        longitude: weather.longitude,
+
+        insights,
+      });
+    } catch (error) {
+      console.error(
+        "Personalized weather error:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Unable to generate personalized weather.",
+        message: error.message,
+      });
+    }
+  }
+);
+
+/* --------------------------------
+   HEALTH CHECK
+-------------------------------- */
+
 app.get("/", (req, res) => {
   res.json({
     status: "Atmos backend is running",
+    service: "weather-api",
   });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `Atmos backend running on port ${PORT}`
-  );
-});
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+    console.log(
+      `Atmos backend running on port ${PORT}`
+    );
+  }
+);

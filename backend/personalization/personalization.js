@@ -1,3 +1,30 @@
+function getCurrentHourlyIndex(weather) {
+  const currentTime = weather.current?.time;
+  const hourlyTimes = weather.hourly?.time || [];
+
+  if (!currentTime || hourlyTimes.length === 0) {
+    return 0;
+  }
+
+  const current = new Date(currentTime).getTime();
+
+  let closestIndex = 0;
+  let smallestDifference = Infinity;
+
+  hourlyTimes.forEach((time, index) => {
+    const difference = Math.abs(
+      new Date(time).getTime() - current
+    );
+
+    if (difference < smallestDifference) {
+      smallestDifference = difference;
+      closestIndex = index;
+    }
+  });
+
+  return closestIndex;
+}
+
 function getPersonalizedInsights(persona, weather) {
   const insights = [];
 
@@ -25,15 +52,25 @@ function getPersonalizedInsights(persona, weather) {
     current.uv_index ?? 0
   );
 
+  // Find the actual current hour
+  const currentHourIndex =
+    getCurrentHourlyIndex(weather);
+
   const rainProbability = Number(
-    hourly.precipitation_probability?.[0] ?? 0
+    hourly.precipitation_probability?.[
+      currentHourIndex
+    ] ?? 0
   );
 
   const soilMoisture =
-    hourly.soil_moisture_0_to_7cm?.[0] ?? null;
+    hourly.soil_moisture_0_to_7cm?.[
+      currentHourIndex
+    ] ?? null;
 
   const soilTemperature =
-    hourly.soil_temperature_0cm?.[0] ?? null;
+    hourly.soil_temperature_0cm?.[
+      currentHourIndex
+    ] ?? null;
 
   const dailyRain = Number(
     daily.precipitation_probability_max?.[0] ?? 0
@@ -173,12 +210,13 @@ function getPersonalizedInsights(persona, weather) {
           "Soil temperatures are relatively high. Monitor moisture carefully because warm soil can increase water loss.",
       });
     }
+  }
 
   // ------------------------------------
   // COMMUTER
   // ------------------------------------
 
-  } else if (persona === "commuter") {
+  else if (persona === "commuter") {
     if (
       precipitation > 0 ||
       rainProbability >= 60
@@ -247,12 +285,13 @@ function getPersonalizedInsights(persona, weather) {
           "UV levels are high. If possible, avoid prolonged exposure to direct sunlight during peak hours.",
       });
     }
+  }
 
   // ------------------------------------
   // TRAVELLER
   // ------------------------------------
 
-  } else if (persona === "traveller") {
+  else if (persona === "traveller") {
     if (
       precipitation > 0 ||
       rainProbability >= 60
@@ -321,8 +360,13 @@ function getPersonalizedInsights(persona, weather) {
           "High humidity may make outdoor activities feel less comfortable. Keep water with you.",
       });
     }
+  }
 
-  } else {
+  // ------------------------------------
+  // DEFAULT
+  // ------------------------------------
+
+  else {
     insights.push({
       type: "good",
       priority: "low",

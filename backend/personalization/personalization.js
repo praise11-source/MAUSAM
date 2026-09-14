@@ -39,6 +39,10 @@ function getPersonalizedInsights(persona, weather) {
     daily.precipitation_probability_max?.[0] ?? 0
   );
 
+  // ------------------------------------
+  // AGRICULTURE
+  // ------------------------------------
+
   if (persona === "agriculture") {
     if (precipitation > 0) {
       insights.push({
@@ -169,6 +173,11 @@ function getPersonalizedInsights(persona, weather) {
           "Soil temperatures are relatively high. Monitor moisture carefully because warm soil can increase water loss.",
       });
     }
+
+  // ------------------------------------
+  // COMMUTER
+  // ------------------------------------
+
   } else if (persona === "commuter") {
     if (
       precipitation > 0 ||
@@ -238,6 +247,11 @@ function getPersonalizedInsights(persona, weather) {
           "UV levels are high. If possible, avoid prolonged exposure to direct sunlight during peak hours.",
       });
     }
+
+  // ------------------------------------
+  // TRAVELLER
+  // ------------------------------------
+
   } else if (persona === "traveller") {
     if (
       precipitation > 0 ||
@@ -307,6 +321,7 @@ function getPersonalizedInsights(persona, weather) {
           "High humidity may make outdoor activities feel less comfortable. Keep water with you.",
       });
     }
+
   } else {
     insights.push({
       type: "good",

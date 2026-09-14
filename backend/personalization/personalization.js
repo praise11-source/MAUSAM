@@ -1,36 +1,11 @@
-function getCurrentHourlyIndex(weather) {
-  const currentTime = weather.current?.time;
-  const hourlyTimes = weather.hourly?.time || [];
-
-  if (!currentTime || hourlyTimes.length === 0) {
-    return 0;
-  }
-
-  const current = new Date(currentTime).getTime();
-
-  let closestIndex = 0;
-  let smallestDifference = Infinity;
-
-  hourlyTimes.forEach((time, index) => {
-    const difference = Math.abs(
-      new Date(time).getTime() - current
-    );
-
-    if (difference < smallestDifference) {
-      smallestDifference = difference;
-      closestIndex = index;
-    }
-  });
-
-  return closestIndex;
-}
-
-function getPersonalizedInsights(persona, weather) {
+function getPersonalizedInsights(
+  persona,
+  weather
+) {
   const insights = [];
 
-  const current = weather.current || {};
-  const hourly = weather.hourly || {};
-  const daily = weather.daily || {};
+  const current = weather?.current || {};
+  const hourly = weather?.hourly || {};
 
   const temperature = Number(
     current.temperature_2m ?? 0
@@ -52,343 +27,226 @@ function getPersonalizedInsights(persona, weather) {
     current.uv_index ?? 0
   );
 
-  // Find the actual current hour
-  const currentHourIndex =
-    getCurrentHourlyIndex(weather);
-
   const rainProbability = Number(
-    hourly.precipitation_probability?.[
-      currentHourIndex
-    ] ?? 0
+    hourly?.precipitation_probability?.[0] ??
+      0
   );
 
-  const soilMoisture =
-    hourly.soil_moisture_0_to_7cm?.[
-      currentHourIndex
-    ] ?? null;
-
-  const soilTemperature =
-    hourly.soil_temperature_0cm?.[
-      currentHourIndex
-    ] ?? null;
-
-  const dailyRain = Number(
-    daily.precipitation_probability_max?.[0] ?? 0
+  const soilMoisture = Number(
+    hourly?.soil_moisture_0_to_7cm?.[0] ??
+      0
   );
 
-  // ------------------------------------
-  // AGRICULTURE
-  // ------------------------------------
+  const soilTemperature = Number(
+    hourly?.soil_temperature_0cm?.[0] ??
+      0
+  );
 
-  if (persona === "agriculture") {
-    if (precipitation > 0) {
-      insights.push({
-        type: "rain",
-        priority: "high",
-        title: "Rain is falling",
-        message:
-          "Natural rainfall is occurring right now. Consider pausing irrigation and allowing the soil to absorb the available moisture.",
-      });
-    } else if (
-      rainProbability >= 60 ||
-      dailyRain >= 60
-    ) {
-      const probability = Math.max(
-        rainProbability,
-        dailyRain
-      );
+  /* -------------------------------
+     COMMON CONDITIONS
+  ------------------------------- */
 
-      insights.push({
-        type: "rain",
-        priority: "high",
-        title: "Rain likely today",
-        message:
-          `There is around a ${probability}% chance of rain. Consider delaying irrigation if the soil is already sufficiently moist.`,
-      });
-    } else {
-      insights.push({
-        type: "rain",
-        priority: "low",
-        title: "Low rain chance",
-        message:
-          "Significant rainfall is not currently expected. Check soil moisture before deciding whether irrigation is needed.",
-      });
-    }
-
-    if (
-      soilMoisture !== null &&
-      Number(soilMoisture) < 0.2
-    ) {
-      insights.push({
-        type: "irrigation",
-        priority: "high",
-        title: "Soil may need water",
-        message:
-          "Soil moisture is relatively low. Check the soil around your plants and consider irrigation if it feels dry.",
-      });
-    } else if (
-      soilMoisture !== null &&
-      Number(soilMoisture) <= 0.4
-    ) {
-      insights.push({
-        type: "irrigation",
-        priority: "low",
-        title: "Soil moisture is balanced",
-        message:
-          "Current soil moisture is in a moderate range. Avoid unnecessary watering unless your crops show signs of stress.",
-      });
-    } else if (
-      soilMoisture !== null &&
-      Number(soilMoisture) > 0.4
-    ) {
-      insights.push({
-        type: "irrigation",
-        priority: "medium",
-        title: "Soil is well hydrated",
-        message:
-          "Soil moisture is relatively high. Hold off on additional watering and allow excess moisture to drain naturally.",
-      });
-    }
-
-    if (temperature >= 35) {
-      insights.push({
-        type: "heat",
-        priority: "high",
-        title: "Heat stress possible",
-        message:
-          "High temperatures may increase water loss from soil and place stress on plants. Monitor crops and moisture levels closely.",
-      });
-    } else if (temperature >= 32) {
-      insights.push({
-        type: "heat",
-        priority: "medium",
-        title: "Warm growing conditions",
-        message:
-          "Warm conditions may increase evaporation. Check plants and soil more frequently during the warmer part of the day.",
-      });
-    }
-
-    if (wind >= 30) {
-      insights.push({
-        type: "wind",
-        priority: "medium",
-        title: "Protect exposed crops",
-        message:
-          "Strong winds may affect young or exposed plants. Check supports, seedlings and other vulnerable areas.",
-      });
-    }
-
-    if (uv >= 8) {
-      insights.push({
-        type: "uv",
-        priority: "medium",
-        title: "Strong sunlight",
-        message:
-          "UV levels are high. Monitor plants for heat or sun stress, particularly during peak afternoon hours.",
-      });
-    }
-
-    if (humidity >= 80) {
-      insights.push({
-        type: "humidity",
-        priority: "medium",
-        title: "Fungal disease risk",
-        message:
-          "High humidity can keep leaves damp for longer. Good spacing and airflow can help reduce fungal disease risk.",
-      });
-    }
-
-    if (
-      soilTemperature !== null &&
-      Number(soilTemperature) >= 30
-    ) {
-      insights.push({
-        type: "heat",
-        priority: "medium",
-        title: "Warm soil conditions",
-        message:
-          "Soil temperatures are relatively high. Monitor moisture carefully because warm soil can increase water loss.",
-      });
-    }
-  }
-
-  // ------------------------------------
-  // COMMUTER
-  // ------------------------------------
-
-  else if (persona === "commuter") {
-    if (
-      precipitation > 0 ||
-      rainProbability >= 60
-    ) {
-      insights.push({
-        type: "rain",
-        priority: "high",
-        title: "Rain may slow your commute",
-        message:
-          "Rain is occurring or likely soon. Carry rain protection and allow some extra travel time.",
-      });
-    } else {
-      insights.push({
-        type: "good",
-        priority: "low",
-        title: "Low rain risk",
-        message:
-          "There is currently no major rain signal for your commute.",
-      });
-    }
-
-    if (wind >= 30) {
-      insights.push({
-        type: "wind",
-        priority: "medium",
-        title: "Windy commute",
-        message:
-          "Strong winds may make travelling more difficult, particularly on two-wheelers. Travel carefully.",
-      });
-    }
-
-    if (temperature >= 35) {
-      insights.push({
-        type: "heat",
-        priority: "high",
-        title: "Hot commute",
-        message:
-          "Temperatures are high. Stay hydrated and minimize unnecessary exposure to direct sunlight.",
-      });
-    } else if (temperature >= 32) {
-      insights.push({
-        type: "heat",
-        priority: "medium",
-        title: "Warm commute",
-        message:
-          "The weather may feel warm during your journey. Keep water with you, especially for longer trips.",
-      });
-    }
-
-    if (humidity >= 80) {
-      insights.push({
-        type: "humidity",
-        priority: "medium",
-        title: "Humid conditions",
-        message:
-          "High humidity can make the journey feel warmer and less comfortable than the temperature suggests.",
-      });
-    }
-
-    if (uv >= 8) {
-      insights.push({
-        type: "uv",
-        priority: "medium",
-        title: "Strong afternoon sun",
-        message:
-          "UV levels are high. If possible, avoid prolonged exposure to direct sunlight during peak hours.",
-      });
-    }
-  }
-
-  // ------------------------------------
-  // TRAVELLER
-  // ------------------------------------
-
-  else if (persona === "traveller") {
-    if (
-      precipitation > 0 ||
-      rainProbability >= 60
-    ) {
-      insights.push({
-        type: "rain",
-        priority: "high",
-        title: "Rain may affect your plans",
-        message:
-          "Rain is occurring or likely soon. Carry an umbrella and consider keeping an indoor alternative in your plans.",
-      });
-    } else {
-      insights.push({
-        type: "good",
-        priority: "low",
-        title: "Good conditions for exploring",
-        message:
-          "There is currently no major rain signal, making outdoor activities more favorable.",
-      });
-    }
-
-    if (temperature >= 35) {
-      insights.push({
-        type: "heat",
-        priority: "high",
-        title: "Very warm outdoors",
-        message:
-          "High temperatures are expected. Carry water and plan outdoor activities around cooler periods.",
-      });
-    } else if (temperature >= 32) {
-      insights.push({
-        type: "heat",
-        priority: "medium",
-        title: "Warm outdoor conditions",
-        message:
-          "It may feel warm outdoors. Take breaks and stay hydrated during longer activities.",
-      });
-    }
-
-    if (wind >= 30) {
-      insights.push({
-        type: "wind",
-        priority: "medium",
-        title: "Windy conditions",
-        message:
-          "Strong winds may affect outdoor activities. Check local conditions before planning exposed activities.",
-      });
-    }
-
-    if (uv >= 8) {
-      insights.push({
-        type: "uv",
-        priority: "medium",
-        title: "High UV exposure",
-        message:
-          "Sunlight is strong. Consider scheduling outdoor activities outside the strongest afternoon sunlight.",
-      });
-    }
-
-    if (humidity >= 80) {
-      insights.push({
-        type: "humidity",
-        priority: "low",
-        title: "Humid outdoors",
-        message:
-          "High humidity may make outdoor activities feel less comfortable. Keep water with you.",
-      });
-    }
-  }
-
-  // ------------------------------------
-  // DEFAULT
-  // ------------------------------------
-
-  else {
+  if (
+    rainProbability >= 60 ||
+    precipitation > 0
+  ) {
     insights.push({
-      type: "good",
-      priority: "low",
-      title: "Weather monitored",
+      type: "rain",
+      priority: "high",
+      title: "Rain expected",
       message:
-        "Atmos is monitoring current conditions for your location.",
+        "Rain is likely around the current period. Keep outdoor plans flexible and carry rain protection.",
     });
   }
 
-  const priority = {
-    high: 3,
-    medium: 2,
-    low: 1,
+  if (temperature >= 35) {
+    insights.push({
+      type: "heat",
+      priority: "high",
+      title: "High temperature",
+      message:
+        "Conditions are hot. Stay hydrated and limit prolonged exposure during peak heat.",
+    });
+  }
+
+  if (wind >= 30) {
+    insights.push({
+      type: "wind",
+      priority: "medium",
+      title: "Strong winds",
+      message:
+        "Wind speeds are elevated. Take extra care while travelling and around exposed areas.",
+    });
+  }
+
+  if (uv >= 7) {
+    insights.push({
+      type: "uv",
+      priority: "medium",
+      title: "High UV",
+      message:
+        "UV exposure may be significant. Use shade, sunscreen and protective clothing outdoors.",
+    });
+  }
+
+  if (humidity >= 80) {
+    insights.push({
+      type: "humidity",
+      priority: "medium",
+      title: "High humidity",
+      message:
+        "Humidity is high, which can make conditions feel warmer and less comfortable.",
+    });
+  }
+
+  /* -------------------------------
+     AGRICULTURE
+  ------------------------------- */
+
+  if (persona === "agriculture") {
+    if (
+      rainProbability < 30 &&
+      soilMoisture < 0.25
+    ) {
+      insights.push({
+        type: "irrigation",
+        priority: "high",
+        title: "Irrigation may help",
+        message:
+          "Rain chances are limited and near-surface soil moisture is relatively low.",
+      });
+    }
+
+    if (
+      soilTemperature >= 30
+    ) {
+      insights.push({
+        type: "soil",
+        priority: "medium",
+        title: "Warm soil",
+        message:
+          "Near-surface soil temperatures are elevated. Monitor crop and irrigation needs closely.",
+      });
+    }
+
+    if (
+      rainProbability < 30 &&
+      soilMoisture >= 0.25
+    ) {
+      insights.push({
+        type: "soil",
+        priority: "low",
+        title: "Monitor soil moisture",
+        message:
+          "Current soil moisture is not especially low, but conditions should be monitored as rain chances remain limited.",
+      });
+    }
+  }
+
+  /* -------------------------------
+     COMMUTER
+  ------------------------------- */
+
+  if (persona === "commuter") {
+    if (
+      rainProbability >= 50
+    ) {
+      insights.push({
+        type: "rain",
+        priority: "high",
+        title: "Allow extra commute time",
+        message:
+          "Rain may affect road conditions and visibility. Consider leaving earlier.",
+      });
+    }
+
+    if (
+      wind < 25 &&
+      rainProbability < 30
+    ) {
+      insights.push({
+        type: "good",
+        priority: "low",
+        title: "Favourable commute",
+        message:
+          "Current weather indicators suggest relatively comfortable travel conditions.",
+      });
+    }
+  }
+
+  /* -------------------------------
+     TRAVELLER
+  ------------------------------- */
+
+  if (persona === "traveller") {
+    if (
+      rainProbability >= 50
+    ) {
+      insights.push({
+        type: "rain",
+        priority: "high",
+        title: "Outdoor plans may be affected",
+        message:
+          "Rain is possible. Keep outdoor activities flexible and carry suitable protection.",
+      });
+    }
+
+    if (
+      temperature >= 35
+    ) {
+      insights.push({
+        type: "heat",
+        priority: "high",
+        title: "Hot outdoor conditions",
+        message:
+          "Outdoor activities may feel uncomfortable during peak afternoon heat.",
+      });
+    }
+
+    if (
+      temperature < 35 &&
+      rainProbability < 30 &&
+      wind < 25
+    ) {
+      insights.push({
+        type: "good",
+        priority: "low",
+        title: "Good outdoor conditions",
+        message:
+          "Current conditions look generally comfortable for outdoor activities.",
+      });
+    }
+  }
+
+  /* -------------------------------
+     FALLBACK
+  ------------------------------- */
+
+  if (insights.length === 0) {
+    insights.push({
+      type: "good",
+      priority: "low",
+      title: "Conditions look stable",
+      message:
+        "Atmos has not detected any major weather concern for this profile.",
+    });
+  }
+
+  const priorityOrder = {
+    high: 0,
+    medium: 1,
+    low: 2,
   };
 
   return insights
     .sort(
       (a, b) =>
-        (priority[b.priority] || 0) -
-        (priority[a.priority] || 0)
+        priorityOrder[a.priority] -
+        priorityOrder[b.priority]
     )
     .slice(0, 5);
 }
 
-module.exports = getPersonalizedInsights;
+module.exports = {
+  getPersonalizedInsights,
+};

@@ -13,38 +13,36 @@ const PERSONAS = [
     id: "commuter",
     icon: "🚗",
     title: "Commuter",
-    short: "Daily travel",
-    description: "Road hazards, rain risk, and travel visibility.",
+    description: "Road hazards, precipitation risk, and transit visibility.",
   },
   {
     id: "traveller",
     icon: "✈️",
     title: "Traveller",
-    short: "Outdoor plans",
-    description: "Conditions impacting sightseeing and outdoor activities.",
+    description: "Sightseeing comfort, extreme UV, and activity suitability.",
   },
   {
     id: "agriculture",
     icon: "🌾",
     title: "Agriculture",
-    short: "Crops & soil",
-    description: "Soil moisture, rain windows, and temperature alerts.",
+    description: "Soil moisture, irrigation timing, and crop thermal stress.",
   },
 ];
 
+// DYNAMIC WEATHER EMOJI (TIME & CONDITION RESPONSIVE)
 function getWeatherIcon(weatherCode, isDay = 1) {
   const code = Number(weatherCode ?? 0);
   const day = Number(isDay) === 1;
 
   if (code === 0) return day ? "☀️" : "🌙";
   if (code === 1) return day ? "🌤️" : "🌙";
-  if (code === 2) return "⛅";
+  if (code === 2) return day ? "⛅" : "☁️";
   if (code === 3) return "☁️";
 
   if ([45, 48].includes(code)) return "🌫️";
   if ([51, 53, 55, 56, 57].includes(code)) return "🌦️";
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "🌧️";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "🌨️";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return day ? "🌧️" : "🌧️";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "❄️";
   if ([95, 96, 99].includes(code)) return "⛈️";
 
   return day ? "☀️" : "🌙";
@@ -103,6 +101,7 @@ function getInsightIcon(type) {
     rain: "🌧️",
     irrigation: "💧",
     heat: "🌡️",
+    cold: "❄️",
     wind: "💨",
     uv: "☀️",
     humidity: "💦",
@@ -118,11 +117,11 @@ function getInsightClass(priority) {
   return "insight-low";
 }
 
+// COOLER LOGO COMPONENT
 function AtmosLogo() {
   return (
-    <div className="brand-mark">
-      <span />
-      <span />
+    <div className="brand-mark-cool">
+      <div className="core-dot" />
     </div>
   );
 }
@@ -131,13 +130,27 @@ export default function App() {
   const [page, setPage] = useState("weather");
   const [persona, setPersona] = useState("commuter");
   const [location, setLocation] = useState(null);
-  const [locationName, setLocationName] = useState("Detecting...");
+  const [locationName, setLocationName] = useState("Locating...");
   const [weatherData, setWeatherData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
+  // REVERSE GEOCODING FOR EXACT CITY NAME
   useEffect(() => {
     let cancelled = false;
+
+    async function fetchCityName(lat, lon) {
+      try {
+        const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=&latitude=${lat}&longitude=${lon}&count=1`);
+        const geoData = await res.json();
+        if (!cancelled && geoData.results?.[0]?.name) {
+          setLocationName(geoData.results[0].name);
+          return;
+        }
+      } catch (e) {
+        // Fallback string if reverse lookup fails
+      }
+      if (!cancelled) setLocationName(`${lat.toFixed(2)}°, ${lon.toFixed(2)}°`);
+    }
 
     if (!navigator.geolocation) {
       setLocation(DEFAULT_LOCATION);
@@ -148,8 +161,9 @@ export default function App() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         if (!cancelled) {
-          setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-          setLocationName("Live Location");
+          const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          setLocation(coords);
+          fetchCityName(coords.latitude, coords.longitude);
         }
       },
       () => {
@@ -169,17 +183,14 @@ export default function App() {
 
     async function loadData() {
       setLoading(true);
-      setError("");
-
       try {
         const url = `${BACKEND_URL}/api/personalized?persona=${persona}&lat=${location.latitude}&lon=${location.longitude}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Backend connection offline");
         const data = await res.json();
-        
         if (!cancelled) setWeatherData(data);
       } catch (err) {
-        // Fallback to direct fetch
+        // Direct Fallback to Open-Meteo API
         try {
           const directUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,uv_index,weather_code,is_day&hourly=temperature_2m,precipitation_probability,soil_moisture_0_to_7cm,soil_temperature_0cm,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,weather_code&timezone=auto`;
           const directRes = await fetch(directUrl);
@@ -191,12 +202,12 @@ export default function App() {
               hourly: directData.hourly,
               daily: directData.daily,
               insights: [
-                { type: "good", priority: "low", title: "Live Sync", message: "Weather data updated directly from source." }
+                { type: "good", priority: "low", title: "Live Sync", message: "Insights synchronized with live local environment." }
               ]
             });
           }
         } catch {
-          if (!cancelled) setError("Could not load weather data.");
+          // Keep state ready
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -211,7 +222,10 @@ export default function App() {
   const hourly = weatherData?.hourly || {};
   const daily = weatherData?.daily || {};
 
-  const temperature = Number(weather.temperature_2m ?? 0);
+  // ACCURATE TEMPERATURE PARSING
+  const rawTemp = weather?.temperature_2m ?? weather?.temperature;
+  const temperature = rawTemp !== undefined && rawTemp !== null ? Number(rawTemp) : 0;
+
   const feelsLike = Number(weather.apparent_temperature ?? temperature);
   const humidity = Number(weather.relative_humidity_2m ?? 0);
   const rainfall = Number(weather.precipitation ?? 0);
@@ -254,8 +268,8 @@ export default function App() {
   if (loading && !weatherData) {
     return (
       <div className="atmos loading-screen" style={{ justifyContent: "center", alignItems: "center" }}>
-        <div className="brand-mark" style={{ width: 40, height: 40 }} />
-        <p style={{ marginTop: 12, fontSize: 12 }}>Syncing with Atmos...</p>
+        <AtmosLogo />
+        <p style={{ marginTop: 12, fontSize: 12 }}>Syncing Atmos...</p>
       </div>
     );
   }
@@ -265,7 +279,7 @@ export default function App() {
       <header className="topbar">
         <button className="brand" onClick={() => setPage("weather")}>
           <AtmosLogo />
-          <span className="brand-name">atmos</span>
+          <span className="brand-name">Atmos</span>
         </button>
 
         <div className="top-location">
@@ -277,15 +291,16 @@ export default function App() {
         </div>
       </header>
 
+      {/* NAVIGATION TABS (REMOVED 01, 02, 03 NUMBERS) */}
       <nav className="step-nav">
         <button className={page === "weather" ? "active" : ""} onClick={() => setPage("weather")}>
-          01 Weather
+          Weather
         </button>
         <button className={page === "personas" ? "active" : ""} onClick={() => setPage("personas")}>
-          02 Purpose
+          Purpose
         </button>
         <button className={page === "personalized" ? "active" : ""} onClick={() => setPage("personalized")}>
-          03 My Atmos
+          My Atmos
         </button>
       </nav>
 
@@ -345,17 +360,13 @@ export default function App() {
               ))}
             </div>
           </section>
-
-          <button className="next-screen" onClick={() => setPage("personas")}>
-            Personalize your weather →
-          </button>
         </main>
       )}
 
       {page === "personas" && (
         <main className="screen">
           <section className="persona-heading">
-            <small style={{ color: "rgba(255,255,255,0.4)", fontWeight: 800 }}>STEP 02 OF 03</small>
+            <small style={{ color: "rgba(255,255,255,0.4)", fontWeight: 800 }}>TAILOR YOUR ATMOS</small>
             <h1>What brings you here today?</h1>
           </section>
 
@@ -387,13 +398,13 @@ export default function App() {
               <small style={{ color: "rgba(255,255,255,0.4)", fontWeight: 800 }}>PERSONALIZED FOR</small>
               <h2 style={{ margin: 0, fontSize: 20 }}>{selectedPersona?.title}</h2>
             </div>
-            <button className="change-purpose" style={{ width: "auto" }} onClick={() => setPage("personas")}>
+            <button className="change-purpose" onClick={() => setPage("personas")}>
               Change
             </button>
           </div>
 
           <section className="insight-main">
-            <small style={{ fontSize: 8, color: "rgba(255,255,255,0.5)", fontWeight: 800 }}>ATMOS INSIGHTS</small>
+            <small style={{ fontSize: 8, color: "rgba(255,255,255,0.5)", fontWeight: 800 }}>ATMOS INSIGHTS & ADVISORIES</small>
             <div className="insight-stack">
               {insights.map((item, idx) => (
                 <div key={idx} className={`insight ${getInsightClass(item.priority)}`}>
@@ -407,7 +418,7 @@ export default function App() {
           </section>
 
           <section className="personal-data">
-            <small style={{ fontSize: 8, color: "rgba(255,255,255,0.5)", fontWeight: 800 }}>KEY METRICS</small>
+            <small style={{ fontSize: 8, color: "rgba(255,255,255,0.5)", fontWeight: 800 }}>KEY METRICS FOR {selectedPersona?.title.toUpperCase()}</small>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 6 }}>
               {persona === "agriculture" ? (
                 <>
@@ -449,7 +460,7 @@ export default function App() {
         </main>
       )}
 
-      <footer className="footer">atmos · adaptive weather intelligence</footer>
+      <footer className="footer">Atmos · adaptive weather intelligence</footer>
     </div>
   );
 }

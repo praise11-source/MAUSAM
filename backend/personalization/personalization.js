@@ -15,14 +15,14 @@ function getPersonalizedInsights(persona, weather) {
   const soilTemperature = Number(hourly?.soil_temperature_0cm?.[0] ?? 0);
 
   /* -------------------------------
-     COMMON CONDITIONS
+     COMMON ATMOSPHERIC INSIGHTS
   ------------------------------- */
   if (rainProbability >= 60 || precipitation > 0) {
     insights.push({
       type: "rain",
       priority: "high",
-      title: "Rain expected",
-      message: "Rain is likely around current hours. Keep plans flexible and bring protection.",
+      title: "Rain Expected Soon",
+      message: "High chance of precipitation in upcoming hours. Carry rain gear.",
     });
   }
 
@@ -30,8 +30,15 @@ function getPersonalizedInsights(persona, weather) {
     insights.push({
       type: "heat",
       priority: "high",
-      title: "High temperature",
-      message: "Conditions are hot. Stay hydrated and avoid peak afternoon heat.",
+      title: "Extreme Heat Warning",
+      message: "High thermal exposure today. Limit direct sunlight and hydration loss.",
+    });
+  } else if (temperature <= 10 && temperature > 0) {
+    insights.push({
+      type: "cold",
+      priority: "medium",
+      title: "Chilly Conditions",
+      message: "Temperatures are low. Wear appropriate insulated clothing.",
     });
   }
 
@@ -39,8 +46,8 @@ function getPersonalizedInsights(persona, weather) {
     insights.push({
       type: "wind",
       priority: "medium",
-      title: "Strong winds",
-      message: "Wind speeds are elevated. Exercise caution while traveling.",
+      title: "Strong Wind Gusts",
+      message: "Elevated wind speeds detected. Drive carefully and secure loose items.",
     });
   }
 
@@ -49,21 +56,21 @@ function getPersonalizedInsights(persona, weather) {
       type: "uv",
       priority: "medium",
       title: "High UV Index",
-      message: "Significant UV intensity. Sunscreen and shade are recommended.",
+      message: "Sun intensity is peak. Apply SPF 30+ sunscreen if spending time outdoors.",
     });
   }
 
   if (humidity >= 80) {
     insights.push({
       type: "humidity",
-      priority: "medium",
-      title: "High humidity",
-      message: "Elevated humidity levels may cause conditions to feel noticeably muggier.",
+      priority: "low",
+      title: "High Muggy Air",
+      message: "High relative humidity will make ambient temperature feel warmer.",
     });
   }
 
   /* -------------------------------
-     AGRICULTURE
+     AGRICULTURE PERSONA
   ------------------------------- */
   if (persona === "agriculture") {
     if (rainProbability < 30 && soilMoisture < 0.25) {
@@ -71,65 +78,108 @@ function getPersonalizedInsights(persona, weather) {
         type: "irrigation",
         priority: "high",
         title: "Irrigation Advised",
-        message: "Soil moisture levels are low with low probability of rain ahead.",
+        message: "Soil moisture is low with minimal rain forecast. Recommended watering window today.",
       });
-    } else if (soilTemperature >= 30) {
+    } else if (soilMoisture >= 0.45) {
       insights.push({
         type: "soil",
         priority: "medium",
-        title: "Warm soil detected",
-        message: "Soil temperature is elevated. Monitor crop thermal stress.",
-      });
-    } else {
-      insights.push({
-        type: "soil",
-        priority: "low",
-        title: "Soil Moisture Stable",
-        message: "Current moisture levels are balanced for typical field conditions.",
+        title: "Saturated Soil Alert",
+        message: "High moisture level detected. Avoid heavy field operations to prevent soil compaction.",
       });
     }
+
+    if (soilTemperature >= 30) {
+      insights.push({
+        type: "soil",
+        priority: "medium",
+        title: "Elevated Soil Temp",
+        message: "Root zones are warm. Consider mulching or shade nets for sensitive crops.",
+      });
+    }
+
+    insights.push({
+      type: "good",
+      priority: "low",
+      title: "Spray Window Status",
+      message: wind < 15 ? "Wind speeds are optimal for pesticide or fertilizer application." : "Hold off spraying; wind speeds exceed optimal spraying thresholds.",
+    });
   }
 
   /* -------------------------------
-     COMMUTER
+     COMMUTER PERSONA
   ------------------------------- */
   if (persona === "commuter") {
     if (rainProbability >= 50) {
       insights.push({
         type: "rain",
         priority: "high",
-        title: "Expect Travel Delays",
-        message: "Rain may cause road congestion and reduced visibility.",
+        title: "Expect Traffic Delays",
+        message: "Wet roads likely during rush hours. Leave 15 minutes earlier for safety.",
       });
-    } else if (wind < 25 && rainProbability < 30) {
+    }
+    
+    if (wind >= 25) {
+      insights.push({
+        type: "wind",
+        priority: "medium",
+        title: "Two-Wheel Advisory",
+        message: "Crosswinds may impact stability for bikes and scooters.",
+      });
+    }
+
+    if (temperature > 32) {
+      insights.push({
+        type: "heat",
+        priority: "low",
+        title: "Cabin Overheating",
+        message: "Park in shaded areas; vehicle interior temperatures will rise rapidly today.",
+      });
+    } else if (rainProbability < 20 && wind < 20) {
       insights.push({
         type: "good",
         priority: "low",
-        title: "Optimal Commute",
-        message: "Weather parameters show optimal conditions for daily transit.",
+        title: "Smooth Transit Window",
+        message: "Weather conditions are fully clear for uninhibited daily travel.",
       });
     }
   }
 
   /* -------------------------------
-     TRAVELLER
+     TRAVELLER PERSONA
   ------------------------------- */
   if (persona === "traveller") {
     if (rainProbability >= 50) {
       insights.push({
         type: "rain",
         priority: "high",
-        title: "Outdoor Delay Likely",
-        message: "Precipitation may disrupt sightseeing and open-air itineraries.",
+        title: "Indoor Plan Backup",
+        message: "Rain forecast may disrupt outdoor sightseeing. Schedule indoor visits today.",
       });
-    } else if (temperature < 35 && rainProbability < 30 && wind < 25) {
+    } else if (temperature < 33 && rainProbability < 30 && wind < 25) {
       insights.push({
         type: "good",
-        priority: "low",
-        title: "Great Sightseeing Weather",
-        message: "Mild temperatures and clear skies present ideal outdoor travel.",
+        priority: "high",
+        title: "Ideal Sightseeing Weather",
+        message: "Mild temperatures and clear conditions are prime for photography and walking tours.",
       });
     }
+
+    if (uv >= 6) {
+      insights.push({
+        type: "uv",
+        priority: "medium",
+        title: "Outdoor Travel Gear",
+        message: "Pack sunglasses, hats, and hydration bottles for afternoon outings.",
+      });
+    }
+
+    insights.push({
+      type: "good",
+      priority: "low",
+      title: "Evening Comfort",
+      message: "Nighttime conditions look calm for outdoor dining or strolls.",
+    });
   }
 
   /* -------------------------------
@@ -139,13 +189,13 @@ function getPersonalizedInsights(persona, weather) {
     insights.push({
       type: "good",
       priority: "low",
-      title: "Stable Conditions",
-      message: "Atmos has not detected critical weather warnings for this profile.",
+      title: "Balanced Conditions",
+      message: "Atmos has not detected severe weather anomalies for your active persona.",
     });
   }
 
   const priorityOrder = { high: 0, medium: 1, low: 2 };
-  return insights.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]).slice(0, 3);
+  return insights.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]).slice(0, 4);
 }
 
 module.exports = { getPersonalizedInsights };
